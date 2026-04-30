@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>订单详情</title>
+    <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div class="layout">
+    <aside class="sidebar">
+        <h2>方圆订单系统</h2>
+        <nav>
+            <a class="nav-link" href="/dashboard">工作台</a>
+            <a class="nav-link" href="/orders">订单列表</a>
+            <a class="nav-link" href="/orders/new">新建订单</a>
+            <a class="nav-link" href="/print-jobs">打印队列</a>
+            <a class="nav-link" href="/showcase">货物展示</a>
+            <a class="nav-link" href="/showcase/manage">展示管理</a>
+            {% if current_user.is_admin %}
+            <a class="nav-link" href="/users">用户管理</a>
+            {% endif %}
+            <a class="nav-link" href="/logout">退出登录</a>
+        </nav>
+    </aside>
+
+    <main class="content">
+        <div class="page-header">
+            <div>
+                <h1>订单详情</h1>
+                <p>订单号：{{ order.order_no }}</p>
+            </div>
+            <div>
+                <a class="btn-secondary" href="/orders">返回列表</a>
+                <a class="btn-secondary" href="/orders/{{ order.id }}/edit">编辑订单</a>
+            </div>
+        </div>
+
+        <div class="card detail-grid">
+            <div><strong>客户：</strong>{{ order.customer }}</div>
+            <div><strong>电话：</strong>{{ order.phone }}</div>
+            <div><strong>商品：</strong>{{ order.item_name }}</div>
+            <div><strong>尺寸：</strong>{{ order.size }}</div>
+            <div><strong>数量：</strong>{{ order.quantity }}</div>
+            <div><strong>单价：</strong>{{ order.unit_price }}</div>
+            <div><strong>总金额：</strong>{{ order.total_amount }}</div>
+            <div><strong>定金：</strong>{{ order.paid_amount }}</div>
+            <div><strong>待结金额：</strong>{{ order.unpaid_amount }}</div>
+            <div><strong>付款状态：</strong><span class="status-badge status-payment-{{ order.payment_status }}">{{ order.payment_status }}</span></div>
+            <div><strong>打印状态：</strong><span class="status-badge status-print-{{ order.print_status }}">{{ order.print_status }}</span></div>
+            <div class="full-row"><strong>备注：</strong>{{ order.remark }}</div>
+        </div>
+
+        <div class="card action-row">
+    {% if order.print_status == "未打印" %}
+    <form action="/orders/{{ order.id }}/print" method="post" onsubmit="return confirm('确认发送到打印队列？Win7 客户端打印成功后才会标记为已打印。');">
+        <button class="btn-primary" type="submit">发送到打印队列</button>
+    </form>
+    {% endif %}
+
+    {% if order.payment_status == "未付款" %}
+    <form action="/orders/{{ order.id }}/paid" method="post" onsubmit="return confirm('确认该订单已一次性结清？');">
+        <button class="btn-primary" type="submit">标记已结清</button>
+    </form>
+    {% else %}
+    <form action="/orders/{{ order.id }}/unpaid" method="post" onsubmit="return confirm('确认改回未付款？');">
+        <button class="btn-secondary" type="submit">改回未付款</button>
+    </form>
+    {% endif %}
+
+    <form action="/orders/{{ order.id }}/undo" method="post" onsubmit="return confirm('确认撤回最近一次状态操作？');">
+        <button class="btn-secondary" type="submit">撤回上一步</button>
+    </form>
+
+    <form action="/orders/{{ order.id }}/delete" method="post" onsubmit="return confirm('删除订单是重要操作，确认继续？');">
+        <button class="btn-danger" type="submit">删除订单</button>
+    </form>
+</div>
+    </main>
+</div>
+</body>
+</html>

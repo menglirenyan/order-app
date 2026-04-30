@@ -1,0 +1,17 @@
+{
+  "name": "方圆订单系统",
+  "short_name": "订单系统",
+  "start_url": "/orders/new",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5f7fb",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/static/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

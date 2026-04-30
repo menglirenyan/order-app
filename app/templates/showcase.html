@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>货物展示</title>
+    <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div class="public-page">
+    <div class="public-header shop-header">
+        <div>
+            <h1>货物展示</h1>
+            <p>{{ items|length }} 个货物{% if current_category %} · {{ current_category }}{% endif %}</p>
+        </div>
+    </div>
+
+    {% if categories %}
+    <div class="category-tabs">
+        <a class="category-tab {% if not current_category %}active{% endif %}" href="/showcase">全部</a>
+        {% for category in categories %}
+        <a class="category-tab {% if current_category == category %}active{% endif %}" href="/showcase?category={{ category|urlencode }}">{{ category }}</a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if items %}
+    <div class="showcase-grid shop-grid">
+        {% for item in items %}
+        <article class="showcase-card shop-card">
+            {% if item.image_url %}
+            <div class="showcase-image-frame">
+                <img src="{{ item.image_url }}" alt="{{ item.title }}">
+            </div>
+            {% else %}
+            <div class="showcase-image-frame showcase-image-empty">暂无图片</div>
+            {% endif %}
+            <div class="showcase-card-body">
+                <div class="showcase-category">{{ item.category or "未分类" }}</div>
+                <h3>{{ item.title }}</h3>
+                {% if item.description %}
+                <p>{{ item.description }}</p>
+                {% endif %}
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-box">当前暂无展示内容。</div>
+    {% endif %}
+</div>
+</body>
+</html>

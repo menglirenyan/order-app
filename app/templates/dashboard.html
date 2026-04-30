@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>工作台</title>
+    <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div class="layout">
+    <aside class="sidebar">
+        <h2>方圆订单系统</h2>
+        <nav>
+            <a class="nav-link active" href="/dashboard">工作台</a>
+            <a class="nav-link" href="/orders">订单列表</a>
+            <a class="nav-link" href="/orders/new">新建订单</a>
+            <a class="nav-link" href="/print-jobs">打印队列</a>
+            <a class="nav-link" href="/showcase">货物展示</a>
+            <a class="nav-link" href="/showcase/manage">展示管理</a>
+            {% if current_user.is_admin %}
+            <a class="nav-link" href="/users">用户管理</a>
+            {% endif %}
+            <a class="nav-link" href="/logout">退出登录</a>
+        </nav>
+    </aside>
+
+    <main class="content">
+        <div class="page-header">
+            <div>
+                <h1>未打印订单</h1>
+                <p>当前用户：{{ current_user.username }}</p>
+            </div>
+        </div>
+
+        {% if pending_orders %}
+        <div class="card">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>订单号</th>
+                        <th>客户</th>
+                        <th>商品</th>
+                        <th>尺寸</th>
+                        <th>优先级</th>
+                        <th>截至日期</th>
+                        <th>备注</th>
+                        <th>定金</th>
+                        <th>待结</th>
+                        <th>付款状态</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for order in pending_orders %}
+                    <tr>
+                        <td>{{ order.order_no }}</td>
+                        <td>{{ order.customer }}</td>
+                        <td>{{ order.item_name }}</td>
+                        <td>{{ order.size }}</td>
+                        <td>
+                            <span class="priority-badge priority-{{ order.priority_color }}">
+                                {{ order.priority_color }}
+                            </span>
+                        </td>
+                        <td>{{ order.due_date or "未设置" }}</td>
+                        <td>{{ order.remark or "无" }}</td>
+                        <td>{{ order.paid_amount }}</td>
+                        <td>{{ order.unpaid_amount }}</td>
+                        <td><span class="status-badge status-payment-{{ order.payment_status }}">{{ order.payment_status }}</span></td>
+                        <td><a class="btn-link" href="/orders/{{ order.id }}">查看</a></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-box">
+            当前没有未打印订单。
+        </div>
+        {% endif %}
+    </main>
+</div>
+<nav class="bottom-nav">
+    <a class="active" href="/dashboard">工作台</a>
+    <a href="/orders">订单</a>
+    <a href="/orders/new">新建</a>
+</nav>
+</body>
+</html>

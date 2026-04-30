@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>展示管理</title>
+    <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div class="layout">
+    <aside class="sidebar">
+        <h2>方圆订单系统</h2>
+        <nav>
+            <a class="nav-link" href="/dashboard">工作台</a>
+            <a class="nav-link" href="/orders">订单列表</a>
+            <a class="nav-link" href="/orders/new">新建订单</a>
+            <a class="nav-link" href="/showcase">货物展示</a>
+            <a class="nav-link active" href="/showcase/manage">展示管理</a>
+            {% if current_user.is_admin %}
+            <a class="nav-link" href="/users">用户管理</a>
+            {% endif %}
+            <a class="nav-link" href="/logout">退出登录</a>
+        </nav>
+    </aside>
+
+    <main class="content">
+        <div class="page-header manage-showcase-header">
+            <div>
+                <h1>展示管理</h1>
+                <p>{{ items|length }} 个货物{% if current_category %} · {{ current_category }}{% endif %}</p>
+            </div>
+            <div class="page-actions">
+                <button class="btn-primary selection-action" type="button" id="openQuoteBtn" hidden>生成报价单</button>
+                <button class="btn-danger selection-action" type="button" id="deleteItemsBtn" hidden>删除货物</button>
+                <button class="btn-secondary selection-action" type="button" id="cancelSelectBtn" hidden>取消选择</button>
+                <a class="btn-secondary" href="/showcase" target="_blank">浏览页</a>
+                <a class="btn-primary" href="/showcase/manage/new" id="newItemBtn">新增货物</a>
+            </div>
+        </div>
+
+        {% if categories %}
+        <div class="category-tabs manage-tabs">
+            <a class="category-tab {% if not current_category %}active{% endif %}" href="/showcase/manage">全部</a>
+            {% for category in categories %}
+            <a class="category-tab {% if current_category == category %}active{% endif %}" href="/showcase/manage?category={{ category|urlencode }}">{{ category }}</a>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if items %}
+        <div class="showcase-grid shop-grid manage-selection-grid" id="manageGrid">
+            {% for item in items %}
+            <article class="showcase-card shop-card manage-select-card" data-item-id="{{ item.id }}" data-title="{{ item.title }}" data-image-url="{{ item.image_url or '' }}">
+                <div class="selection-mark" aria-hidden="true"></div>
+                {% if item.image_url %}
+                <div class="showcase-image-frame">
+                    <img src="{{ item.image_url }}" alt="{{ item.title }}">
+                </div>
+                {% else %}
+                <div class="showcase-image-frame showcase-image-empty">暂无图片</div>
+                {% endif %}
+                <div class="showcase-card-body">
+                    <div class="manage-product-meta">
+                        <span class="showcase-category">{{ item.category or "未分类" }}</span>
+                        <span>{% if item.is_visible %}显示{% else %}隐藏{% endif %}</span>
+                    </div>
+                    <h3>{{ item.title }}</h3>
+                    {% if item.description %}
+                    <p>{{ item.description }}</p>
+                    {% endif %}
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-box">还没有展示项。</div>
+        {% endif %}
+    </main>
+</div>
+
+<div class="quote-modal" id="quoteModal" hidden>
+    <div class="quote-modal-backdrop" data-close-modal></div>
+    <div class="quote-modal-panel" role="dialog" aria-modal="true" aria-labelledby="quoteModalTitle">
+        <div class="quote-modal-head">
+            <div>
+                <h2 id="quoteModalTitle">报价单</h2>
+                <p><span id="quoteCount">0</span> 项，可修改尺寸、数量、价格。</p>
+            </div>
+            <button class="btn-secondary" type="button" data-close-modal>关闭</button>
+        </div>
+        <div class="quote-table-wrap">
+            <table class="quote-table">
+                <thead>
+                    <tr>
+                        <th>货物名称</th>
+                        <th>图片</th>
+                        <th>尺寸</th>
+                        <th>数量</th>
+                        <th>价格</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="quoteBody"></tbody>
+            </table>
+        </div>
+        <div class="quote-actions">
+            <button class="btn-primary" type="button" id="downloadImageBtn">下载 PNG</button>
+            <button class="btn-secondary" type="button" id="downloadExcelBtn">下载 Excel</button>
+            <span class="muted-text" id="quoteStatus"></span>
+        </div>
+    </div>
+</div>
+
+<script>
+const selectedItems = new Map();
+const grid = document.getElementById("manageGrid");
+const quoteModal = document.getElementById("quoteModal");
+const quoteBody = document.getElementById("quoteBody");
+const quoteCount = document.getElementById("quoteCount");
+const quoteStatus = document.getElementById("quoteStatus");
+const selectionActions = Array.from(document.querySelectorAll(".selection-action"));
+const newItemBtn = document.getElementById("newItemBtn");
+let selectionMode = false;
+
+function getCardData(card) {
+    return {
+        id: card.dataset.itemId,
+        name: card.dataset.title || "",
+        image_url: card.dataset.imageUrl || "",
+        size: "",
+        quantity: "1",
+        price: ""
+    };
+}
+
+function setSelectionMode(enabled) {
+    selectionMode = enabled;
+    document.body.classList.toggle("selection-mode", enabled);
+    selectionActions.forEach(item => item.hidden = !enabled);
+    newItemBtn.hidden = enabled;
+    if (!enabled) {
+        selectedItems.clear();
+        document.querySelectorAll(".manage-select-card.selected").forEach(card => card.classList.remove("selected"));
+    }
+    updateSelectionButtons();
+}
+
+function updateSelectionButtons() {
+    const count = selectedItems.size;
+    document.getElementById("openQuoteBtn").textContent = count ? `生成报价单（${count}）` : "生成报价单";
+    document.getElementById("openQuoteBtn").disabled = count === 0;
+    document.getElementById("deleteItemsBtn").disabled = count === 0;
+}
+
+function toggleCard(card, forceSelected = null) {
+    const row = getCardData(card);
+    const shouldSelect = forceSelected === null ? !selectedItems.has(row.id) : forceSelected;
+    if (shouldSelect) {
+        selectedItems.set(row.id, row);
+        card.classList.add("selected");
+    } else {
+        selectedItems.delete(row.id);
+        card.classList.remove("selected");
+    }
+    updateSelectionButtons();
+}
+
+function renderQuoteRows() {
+    const rows = Array.from(selectedItems.values());
+    quoteBody.innerHTML = "";
+    quoteCount.textContent = rows.length;
+    rows.forEach(row => {
+        const tr = document.createElement("tr");
+        const nameTd = document.createElement("td");
+        nameTd.textContent = row.name;
+        tr.appendChild(nameTd);
+
+        const imageTd = document.createElement("td");
+        if (row.image_url) {
+            const img = document.createElement("img");
+            img.className = "quote-thumb";
+            img.src = row.image_url;
+            img.alt = row.name;
+            imageTd.appendChild(img);
+        } else {
+            imageTd.textContent = "无图";
+        }
+        tr.appendChild(imageTd);
+
+        [["size", "text"], ["quantity", "number"], ["price", "text"]].forEach(([field, type]) => {
+            const td = document.createElement("td");
+            const input = document.createElement("input");
+            input.type = type;
+            input.value = row[field];
+            input.dataset.id = row.id;
+            input.dataset.field = field;
+            if (field === "quantity") {
+                input.min = "0";
+                input.step = "1";
+            }
+            input.addEventListener("input", event => {
+                const current = selectedItems.get(event.target.dataset.id);
+                if (current) {
+                    current[event.target.dataset.field] = event.target.value;
+                }
+            });
+            td.appendChild(input);
+            tr.appendChild(td);
+        });
+
+        const actionTd = document.createElement("td");
+        const removeBtn = document.createElement("button");
+        removeBtn.className = "quote-remove-btn";
+        removeBtn.type = "button";
+        removeBtn.textContent = "移除";
+        removeBtn.addEventListener("click", () => {
+            selectedItems.delete(row.id);
+            const card = document.querySelector(`.manage-select-card[data-item-id="${row.id}"]`);
+            if (card) {
+                card.classList.remove("selected");
+            }
+            renderQuoteRows();
+            updateSelectionButtons();
+            if (!selectedItems.size) {
+                quoteModal.hidden = true;
+            }
+        });
+        actionTd.appendChild(removeBtn);
+        tr.appendChild(actionTd);
+        quoteBody.appendChild(tr);
+    });
+}
+
+function quotePayload() {
+    return Array.from(selectedItems.values()).map(row => ({
+        name: row.name,
+        image_url: row.image_url,
+        size: row.size,
+        quantity: row.quantity,
+        price: row.price
+    }));
+}
+
+async function downloadQuote(format) {
+    const rows = quotePayload();
+    if (!rows.length) {
+        return;
+    }
+    quoteStatus.textContent = "生成中...";
+    const endpoint = format === "excel" ? "/showcase/quotation/excel" : "/showcase/quotation/image";
+    const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({rows})
+    });
+    if (!response.ok) {
+        let message = "生成失败";
+        try {
+            const data = await response.json();
+            message = data.error || message;
+        } catch (error) {}
+        quoteStatus.textContent = message;
+        return;
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "");
+    link.href = url;
+    link.download = format === "excel" ? `quotation-${stamp}.xlsx` : `quotation-${stamp}.png`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    quoteStatus.textContent = "已生成";
+}
+
+if (grid) {
+    document.querySelectorAll(".manage-select-card").forEach(card => {
+        let pressTimer = null;
+        let longPressed = false;
+        const startPress = () => {
+            longPressed = false;
+            pressTimer = window.setTimeout(() => {
+                longPressed = true;
+                setSelectionMode(true);
+                toggleCard(card, true);
+            }, 520);
+        };
+        const stopPress = () => {
+            window.clearTimeout(pressTimer);
+        };
+
+        card.addEventListener("mousedown", startPress);
+        card.addEventListener("touchstart", startPress, {passive: true});
+        card.addEventListener("mouseup", stopPress);
+        card.addEventListener("mouseleave", stopPress);
+        card.addEventListener("touchend", stopPress);
+        card.addEventListener("click", event => {
+            if (longPressed) {
+                event.preventDefault();
+                return;
+            }
+            if (selectionMode) {
+                toggleCard(card);
+            }
+        });
+    });
+}
+
+document.getElementById("cancelSelectBtn").addEventListener("click", () => setSelectionMode(false));
+document.getElementById("openQuoteBtn").addEventListener("click", () => {
+    if (!selectedItems.size) {
+        return;
+    }
+    renderQuoteRows();
+    quoteStatus.textContent = "";
+    quoteModal.hidden = false;
+});
+document.getElementById("deleteItemsBtn").addEventListener("click", async () => {
+    const ids = Array.from(selectedItems.keys());
+    if (!ids.length || !confirm(`确认删除 ${ids.length} 个货物？`)) {
+        return;
+    }
+    const response = await fetch("/showcase/manage/delete", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ids})
+    });
+    if (!response.ok) {
+        alert("删除失败");
+        return;
+    }
+    window.location.reload();
+});
+document.getElementById("downloadImageBtn").addEventListener("click", () => downloadQuote("image"));
+document.getElementById("downloadExcelBtn").addEventListener("click", () => downloadQuote("excel"));
+document.querySelectorAll("[data-close-modal]").forEach(item => {
+    item.addEventListener("click", () => quoteModal.hidden = true);
+});
+</script>
+</body>
+</html>

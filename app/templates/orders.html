@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>订单列表</title>
+    <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div class="layout">
+    <aside class="sidebar">
+        <h2>方圆订单系统</h2>
+        <nav>
+            <a class="nav-link" href="/dashboard">工作台</a>
+            <a class="nav-link active" href="/orders">订单列表</a>
+            <a class="nav-link" href="/orders/new">新建订单</a>
+            <a class="nav-link" href="/print-jobs">打印队列</a>
+            <a class="nav-link" href="/showcase">货物展示</a>
+            <a class="nav-link" href="/showcase/manage">展示管理</a>
+            {% if current_user.is_admin %}
+            <a class="nav-link" href="/users">用户管理</a>
+            {% endif %}
+            <a class="nav-link" href="/logout">退出登录</a>
+        </nav>
+    </aside>
+
+    <main class="content">
+        <div class="page-header">
+            <div>
+                <h1>订单列表</h1>
+                <p>默认显示未打印订单；打印成功后单子结束</p>
+            </div>
+        </div>
+
+        <div class="voice-panel query-voice-panel">
+            <button class="voice-icon-button" type="button" id="query-voice-btn" aria-label="语音查询" title="语音查询">
+                <span class="voice-icon" aria-hidden="true"></span>
+            </button>
+            <p id="query-voice-status">点麦克风说查询条件，识别后会直接执行筛选。</p>
+            <textarea id="query-voice-text" rows="2" placeholder="例如：查方圆本月未付款订单，按待结金额高到低"></textarea>
+            <div class="voice-actions">
+                <button class="btn-secondary" type="button" id="parse-query-text-btn">解析查询</button>
+                <button class="btn-secondary" type="button" id="clear-query-draft-btn">清空</button>
+            </div>
+            <div class="query-draft-card" id="query-draft-card" hidden>
+                <div class="query-draft-title">已执行筛选条件</div>
+                <div class="query-draft-fields" id="query-draft-fields"></div>
+                <div class="draft-message" id="query-draft-message"></div>
+            </div>
+        </div>
+
+        <div class="card filter-card">
+            <form method="get" action="/orders" class="filter-form" id="order-filter-form">
+                <input type="text" name="keyword" id="filter-keyword" value="{{ keyword }}" placeholder="搜索：订单号/客户/商品/尺寸/备注">
+
+                <select name="payment_status" id="filter-payment-status">
+                    <option value="">全部付款状态</option>
+                    <option value="未付款" {% if payment_status == "未付款" %}selected{% endif %}>未付款</option>
+                    <option value="已付款" {% if payment_status == "已付款" %}selected{% endif %}>已付款</option>
+                </select>
+
+                <select name="print_status" id="filter-print-status">
+                    <option value="">全部打印状态</option>
+                    <option value="未打印" {% if print_status == "未打印" %}selected{% endif %}>未打印</option>
+                    <option value="已打印" {% if print_status == "已打印" %}selected{% endif %}>已打印</option>
+                </select>
+
+                <input type="date" name="date_from" id="filter-date-from" value="{{ date_from }}">
+                <input type="date" name="date_to" id="filter-date-to" value="{{ date_to }}">
+
+                <select name="sort_by" id="filter-sort-by">
+                    <option value="priority_due" {% if sort_by == "priority_due" %}selected{% endif %}>默认：优先级+截至日期</option>
+                    <option value="payment_first" {% if sort_by == "payment_first" %}selected{% endif %}>未结款优先</option>
+                    <option value="order_new" {% if sort_by == "order_new" %}selected{% endif %}>订单号：新到旧</option>
+                    <option value="order_old" {% if sort_by == "order_old" %}selected{% endif %}>订单号：旧到新</option>
+                    <option value="customer" {% if sort_by == "customer" %}selected{% endif %}>客户名</option>
+                    <option value="item" {% if sort_by == "item" %}selected{% endif %}>商品名</option>
+                    <option value="amount_desc" {% if sort_by == "amount_desc" %}selected{% endif %}>总金额：高到低</option>
+                    <option value="amount_asc" {% if sort_by == "amount_asc" %}selected{% endif %}>总金额：低到高</option>
+                    <option value="unpaid_desc" {% if sort_by == "unpaid_desc" %}selected{% endif %}>待结金额：高到低</option>
+                </select>
+
+                <button class="btn-primary" type="submit">筛选</button>
+                <a class="btn-secondary" href="/orders">重置</a>
+            </form>
+
+            <div class="quick-filter-row">
+                <button type="button" class="btn-secondary" onclick="setQuickRange('today')">今天</button>
+                <button type="button" class="btn-secondary" onclick="setQuickRange('this_month')">本月</button>
+                <button type="button" class="btn-secondary" onclick="setQuickRange('last_month')">上月</button>
+                <button type="button" class="btn-secondary" onclick="setQuickRange('this_year')">本年</button>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="summary-row">
+                <div class="summary-item">
+                    <div class="summary-label">当前结果总金额</div>
+                    <div class="summary-value">{{ "%.2f"|format(total_amount_sum) }}</div>
+                </div>
+
+                <div class="summary-item">
+                    <div class="summary-label">待结金额（总金额扣定金）</div>
+                    <div class="summary-value">{{ "%.2f"|format(balance_due_sum) }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            {% if orders %}
+            <form action="/orders/batch-print" method="post" id="batch-print-form">
+            <div class="bulk-print-bar">
+                <div class="bulk-print-actions">
+                    <button class="btn-secondary" type="button" id="select-all-print">全选未打印</button>
+                    <button class="btn-primary" type="submit" id="batch-print-btn" disabled>批量发送打印</button>
+                </div>
+                <div class="bulk-print-hint" id="batch-print-hint">请选择要发送到 Win7 打印客户端的订单。</div>
+            </div>
+            <table class="data-table orders-table">
+                <thead>
+                    <tr>
+                        <th class="select-col">选择</th>
+                        <th>订单号</th>
+                        <th>客户</th>
+                        <th>商品</th>
+                        <th>尺寸</th>
+                        <th>总金额</th>
+                        <th>定金</th>
+                        <th>待结金额</th>
+                        <th>付款状态</th>
+                        <th>打印状态</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for order in orders %}
+                    <tr>
+                        <td class="select-col">
+                            {% if order.print_status == "未打印" %}
+                            <input class="print-order-checkbox" type="checkbox" name="order_ids" value="{{ order.id }}" aria-label="选择订单 {{ order.order_no }}">
+                            {% else %}
+                            <span class="muted-text">-</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ order.order_no }}</td>
+                        <td>{{ order.customer }}</td>
+                        <td>{{ order.item_name }}</td>
+                        <td>{{ order.size }}</td>
+                        <td>{{ order.total_amount }}</td>
+                        <td>{{ order.paid_amount }}</td>
+                        <td>{{ order.unpaid_amount }}</td>
+                        <td><span class="status-badge status-payment-{{ order.payment_status }}">{{ order.payment_status }}</span></td>
+                        <td><span class="status-badge status-print-{{ order.print_status }}">{{ order.print_status }}</span></td>
+                        <td><a class="btn-link" href="/orders/{{ order.id }}">查看</a></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            <div class="mobile-order-list">
+                {% for order in orders %}
+                <div class="mobile-order-card">
+                    <div class="mobile-order-head">
+                        <strong>{{ order.order_no }}</strong>
+                        <span>{{ order.print_status }}</span>
+                    </div>
+                    <div class="mobile-order-title">{{ order.customer }} - {{ order.item_name }}</div>
+                    <div class="mobile-order-meta">
+                        <span>尺寸：{{ order.size or "无" }}</span>
+                        <span>总额：{{ order.total_amount }}</span>
+                        <span>定金：{{ order.paid_amount }}</span>
+                        <span>待结：{{ order.unpaid_amount }}</span>
+                        <span>付款：<span class="status-badge status-payment-{{ order.payment_status }}">{{ order.payment_status }}</span></span>
+                        <span>打印：<span class="status-badge status-print-{{ order.print_status }}">{{ order.print_status }}</span></span>
+                    </div>
+                    <div class="mobile-card-actions">
+                        {% if order.print_status == "未打印" %}
+                        <label class="mobile-print-select">
+                            <input class="print-order-checkbox" type="checkbox" name="order_ids" value="{{ order.id }}">
+                            选择打印
+                        </label>
+                        {% endif %}
+                        <a class="btn-secondary mobile-order-action" href="/orders/{{ order.id }}">查看</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            </form>
+            {% else %}
+            <div class="empty-box">没有匹配的订单。</div>
+            {% endif %}
+        </div>
+    </main>
+</div>
+
+<nav class="bottom-nav">
+    <a href="/dashboard">工作台</a>
+    <a class="active" href="/orders">订单</a>
+    <a href="/orders/new">新建</a>
+</nav>
+
+<script>
+function pad(num) {
+    return String(num).padStart(2, "0");
+}
+
+function formatDate(d) {
+    const y = d.getFullYear();
+    const m = pad(d.getMonth() + 1);
+    const day = pad(d.getDate());
+    return `${y}-${m}-${day}`;
+}
+
+function setQuickRange(type) {
+    const fromInput = document.querySelector('input[name="date_from"]');
+    const toInput = document.querySelector('input[name="date_to"]');
+
+    const now = new Date();
+    let fromDate = null;
+    let toDate = null;
+
+    if (type === "today") {
+        fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        toDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    }
+
+    if (type === "this_month") {
+        fromDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        toDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    }
+
+    if (type === "last_month") {
+        fromDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        toDate = new Date(now.getFullYear(), now.getMonth(), 0);
+    }
+
+    if (type === "this_year") {
+        fromDate = new Date(now.getFullYear(), 0, 1);
+        toDate = new Date(now.getFullYear(), 11, 31);
+    }
+
+    if (fromDate && toDate) {
+        fromInput.value = formatDate(fromDate);
+        toInput.value = formatDate(toDate);
+    }
+
+    fromInput.form.submit();
+}
+
+const batchPrintForm = document.getElementById("batch-print-form");
+if (batchPrintForm) {
+    const selectAllPrint = document.getElementById("select-all-print");
+    const batchPrintBtn = document.getElementById("batch-print-btn");
+    const batchPrintHint = document.getElementById("batch-print-hint");
+    const checkboxes = Array.from(document.querySelectorAll(".print-order-checkbox"));
+
+    function getSelectedOrderIds() {
+        return new Set(checkboxes.filter(item => item.checked).map(item => item.value));
+    }
+
+    function updateBatchPrintState() {
+        const selectedCount = getSelectedOrderIds().size;
+        batchPrintBtn.disabled = selectedCount === 0;
+        batchPrintHint.textContent = selectedCount
+            ? `已选择 ${selectedCount} 单，提交后由 Win7 客户端调用系统默认打印机。`
+            : "请选择要发送到 Win7 打印客户端的订单。";
+    }
+
+    selectAllPrint.addEventListener("click", () => {
+        const shouldCheck = checkboxes.some(item => !item.checked);
+        checkboxes.forEach(item => {
+            item.checked = shouldCheck;
+        });
+        updateBatchPrintState();
+    });
+
+    checkboxes.forEach(item => item.addEventListener("change", updateBatchPrintState));
+
+    batchPrintForm.addEventListener("submit", event => {
+        const selectedCount = getSelectedOrderIds().size;
+        if (!selectedCount || !confirm(`确认发送 ${selectedCount} 个订单到打印队列？`)) {
+            event.preventDefault();
+        }
+    });
+
+    updateBatchPrintState();
+}
+
+const queryFieldMap = {
+    keyword: "filter-keyword",
+    payment_status: "filter-payment-status",
+    print_status: "filter-print-status",
+    date_from: "filter-date-from",
+    date_to: "filter-date-to",
+    sort_by: "filter-sort-by"
+};
+
+const queryLabels = {
+    keyword: "关键词",
+    payment_status: "付款状态",
+    print_status: "打印状态",
+    date_from: "开始日期",
+    date_to: "结束日期",
+    sort_by: "排序"
+};
+
+const sortLabels = {
+    priority_due: "默认：优先级+截至日期",
+    payment_first: "未结款优先",
+    order_new: "订单号：新到旧",
+    order_old: "订单号：旧到新",
+    customer: "客户名",
+    item: "商品名",
+    amount_desc: "总金额：高到低",
+    amount_asc: "总金额：低到高",
+    unpaid_desc: "待结金额：高到低"
+};
+
+function renderQueryDraft(data) {
+    const pendingQueryDraft = data.draft || {};
+    const fields = document.getElementById("query-draft-fields");
+    const entries = Object.entries(queryLabels).map(([key, label]) => {
+        let value = pendingQueryDraft[key] || "不限";
+        if (key === "sort_by") value = sortLabels[pendingQueryDraft[key]] || "默认：优先级+截至日期";
+        return `<span><strong>${label}</strong>${value}</span>`;
+    });
+    fields.innerHTML = entries.join("");
+
+    const message = document.getElementById("query-draft-message");
+    const issueText = data.issues && data.issues.length ? `执行时有提示：${data.issues.join("；")}` : "已执行只读筛选，不会修改任何订单。";
+    const confidenceText = data.confidence !== undefined ? ` 置信度：${Math.round(data.confidence * 100)}%` : "";
+    message.textContent = `${issueText} 来源：${data.source_model}${confidenceText}`;
+    document.getElementById("query-draft-card").hidden = false;
+}
+
+function submitQueryDraft(draft) {
+    Object.entries(queryFieldMap).forEach(([key, id]) => {
+        const el = document.getElementById(id);
+        if (el) el.value = draft[key] || "";
+    });
+    document.getElementById("order-filter-form").submit();
+}
+
+async function parseQueryVoiceText() {
+    const input = document.getElementById("query-voice-text");
+    const status = document.getElementById("query-voice-status");
+    const text = input.value.trim();
+    if (!text) {
+        status.textContent = "先说一句或输入一段查询条件。";
+        return;
+    }
+
+    status.textContent = "正在生成查询草稿...";
+    const resp = await fetch("/api/voice-order-query-draft", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({text})
+    });
+    const data = await resp.json();
+    if (!data.ok) {
+        status.textContent = data.message || "查询解析失败";
+        return;
+    }
+    renderQueryDraft(data);
+    status.textContent = "已解析，正在执行筛选。";
+    submitQueryDraft(data.draft || {});
+}
+
+function setupQueryVoiceInput() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const voiceBtn = document.getElementById("query-voice-btn");
+    const status = document.getElementById("query-voice-status");
+    if (!SpeechRecognition) {
+        status.textContent = "当前浏览器不支持语音识别，可以直接输入文字后解析。";
+        voiceBtn.disabled = true;
+        return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "zh-CN";
+    recognition.interimResults = false;
+    recognition.continuous = false;
+
+    voiceBtn.addEventListener("click", () => {
+        status.textContent = "正在听...";
+        voiceBtn.classList.add("recording");
+        recognition.start();
+    });
+
+    recognition.addEventListener("result", event => {
+        const text = Array.from(event.results).map(result => result[0].transcript).join("");
+        document.getElementById("query-voice-text").value = text;
+        status.textContent = "已识别，正在生成查询草稿。";
+        parseQueryVoiceText();
+    });
+
+    recognition.addEventListener("end", () => {
+        voiceBtn.classList.remove("recording");
+    });
+
+    recognition.addEventListener("error", event => {
+        voiceBtn.classList.remove("recording");
+        status.textContent = `语音识别失败：${event.error || "请重试"}`;
+    });
+}
+
+document.getElementById("parse-query-text-btn").addEventListener("click", parseQueryVoiceText);
+document.getElementById("clear-query-draft-btn").addEventListener("click", () => {
+    document.getElementById("query-voice-text").value = "";
+    document.getElementById("query-draft-card").hidden = true;
+    document.getElementById("query-voice-status").textContent = "点麦克风说查询条件，识别后会直接执行筛选。";
+});
+setupQueryVoiceInput();
+</script>
+
+</body>
+</html>

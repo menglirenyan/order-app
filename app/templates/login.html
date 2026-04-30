@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>登录</title>
+    <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div class="auth-page">
+    <div class="auth-card">
+        <h1>订单系统登录</h1>
+        <p>请使用授予的账号登录</p>
+
+        {% if error %}
+        <p class="error-text">{{ error }}</p>
+        {% endif %}
+
+        <form action="/login" method="post" class="auth-form">
+            <input type="text" name="username" placeholder="用户名" required>
+            <input type="password" name="password" placeholder="密码" required>
+            <button class="btn-primary" type="submit">登录</button>
+        </form>
+
+        <div class="auth-footer">
+            <a class="btn-link" href="/showcase">游客查看货物展示</a>
+        </div>
+    </div>
+</div>
+</body>
+</html>

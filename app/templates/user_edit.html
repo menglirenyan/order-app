@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>编辑用户</title>
+    <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div class="layout">
+    <aside class="sidebar">
+        <h2>方圆订单系统</h2>
+        <nav>
+            <a class="nav-link" href="/dashboard">工作台</a>
+            <a class="nav-link" href="/orders">订单列表</a>
+            <a class="nav-link" href="/orders/new">新建订单</a>
+            <a class="nav-link" href="/print-jobs">打印队列</a>
+            <a class="nav-link" href="/showcase">货物展示</a>
+            <a class="nav-link" href="/showcase/manage">展示管理</a>
+            <a class="nav-link active" href="/users">用户管理</a>
+            <a class="nav-link" href="/logout">退出登录</a>
+        </nav>
+    </aside>
+
+    <main class="content">
+        <div class="page-header">
+            <div>
+                <h1>编辑用户</h1>
+                <p>当前用户：{{ user_obj.username }}</p>
+            </div>
+        </div>
+
+        <div class="card">
+            {% if error %}
+            <p class="error-text">{{ error }}</p>
+            {% endif %}
+
+            <form action="/users/{{ user_obj.id }}/edit" method="post" class="form-grid">
+                <div>
+                    <label>用户名</label>
+                    <input type="text" name="username" value="{{ user_obj.username }}" required>
+                </div>
+
+                <div>
+                    <label>是否启用</label>
+                    <select name="is_active">
+                        <option value="true" {% if user_obj.is_active %}selected{% endif %}>启用</option>
+                        <option value="false" {% if not user_obj.is_active %}selected{% endif %}>停用</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label>是否管理员</label>
+                    <select name="is_admin">
+                        <option value="false" {% if not user_obj.is_admin %}selected{% endif %}>否</option>
+                        <option value="true" {% if user_obj.is_admin %}selected{% endif %}>是</option>
+                    </select>
+                </div>
+
+                <div></div>
+
+                <div>
+                    <label>新密码（留空则不改）</label>
+                    <input type="password" name="new_password">
+                </div>
+
+                <div>
+                    <label>确认新密码</label>
+                    <input type="password" name="confirm_password">
+                </div>
+
+                <div class="full-width">
+                    <button class="btn-primary" type="submit" onclick="return confirm('确认保存该用户修改？');">保存修改</button>
+                    <a class="btn-secondary" href="/users">返回列表</a>
+                </div>
+            </form>
+        </div>
+    </main>
+</div>
+</body>
+</html> 

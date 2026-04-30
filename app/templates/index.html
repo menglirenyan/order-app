@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+</head>
+<body>
+    <h1>{{ title }}</h1>
+    <p>{{ message }}</p>
+    <p>当前用户：{{ current_user.username }}</p>
+
+    <hr>
+
+    <ul>
+        <li><a href="/orders">查看订单列表</a></li>
+        <li><a href="/orders/new">新建订单</a></li>
+        {% if current_user.is_admin %}
+        <li><a href="/users">用户管理</a></li>
+        {% endif %}
+        <li><a href="/logout">退出登录</a></li>
+    </ul>
+</body>
+</html>

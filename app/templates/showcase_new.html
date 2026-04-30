@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>新增展示项</title>
+    <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div class="layout">
+    <aside class="sidebar">
+        <h2>方圆订单系统</h2>
+        <nav>
+            <a class="nav-link" href="/dashboard">工作台</a>
+            <a class="nav-link" href="/orders">订单列表</a>
+            <a class="nav-link" href="/orders/new">新建订单</a>
+            <a class="nav-link" href="/showcase">货物展示</a>
+            <a class="nav-link active" href="/showcase/manage">展示管理</a>
+            {% if current_user.is_admin %}
+            <a class="nav-link" href="/users">用户管理</a>
+            {% endif %}
+            <a class="nav-link" href="/logout">退出登录</a>
+        </nav>
+    </aside>
+
+    <main class="content">
+        <div class="page-header">
+            <div>
+                <h1>新增展示项</h1>
+                <p>支持上传图片，也可以继续填写图片 URL</p>
+            </div>
+        </div>
+
+        {% if error %}
+        <div class="error-text">{{ error }}</div>
+        {% endif %}
+
+        <div class="card">
+            <form action="/showcase/manage/new" method="post" class="form-grid" enctype="multipart/form-data">
+                <div>
+                    <label>标题</label>
+                    <input type="text" name="title" required>
+                </div>
+
+                <div>
+                    <label>类别</label>
+                    <input type="text" name="category" list="category-options" value="未分类" required>
+                    <datalist id="category-options">
+                        {% for category in categories %}
+                        <option value="{{ category }}"></option>
+                        {% endfor %}
+                    </datalist>
+                    <div class="category-quick-row">
+                        {% for category in categories %}
+                        <button type="button" class="category-quick-btn" data-category="{{ category }}">{{ category }}</button>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div>
+                    <label>排序</label>
+                    <input type="number" name="sort_order" value="0">
+                </div>
+
+                <div class="full-width">
+                    <label>上传图片</label>
+                    <input type="file" name="image_file" accept="image/*">
+                </div>
+
+                <div class="full-width">
+                    <label>图片 URL</label>
+                    <input type="text" name="image_url" placeholder="https://...">
+                </div>
+
+                <div class="full-width">
+                    <label>描述</label>
+                    <textarea name="description" rows="5"></textarea>
+                </div>
+
+                <div>
+                    <label>是否显示</label>
+                    <select name="is_visible">
+                        <option value="true" selected>显示</option>
+                        <option value="false">隐藏</option>
+                    </select>
+                </div>
+
+                <div class="full-width">
+                    <button class="btn-primary" type="submit">保存展示项</button>
+                    <a class="btn-secondary" href="/showcase/manage">返回列表</a>
+                </div>
+            </form>
+        </div>
+    </main>
+</div>
+<script>
+document.querySelectorAll(".category-quick-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+        document.querySelector('input[name="category"]').value = btn.dataset.category;
+    });
+});
+</script>
+</body>
+</html>
