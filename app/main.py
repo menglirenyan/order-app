@@ -1024,7 +1024,7 @@ def open_quote_image(image_url: str):
     try:
         with Image.open(BytesIO(image_bytes)) as source:
             source = ImageOps.exif_transpose(source).convert("RGB")
-            return ImageOps.fit(source, (120, 120), method=Image.Resampling.LANCZOS)
+            return ImageOps.contain(source, (260, 180), method=Image.Resampling.LANCZOS)
     except Exception:
         return None
 
@@ -1065,17 +1065,17 @@ def draw_wrapped_text(draw, text, xy, font, fill, max_width, line_height, max_li
 
 def build_quote_image(rows):
     Image, ImageDraw, _, _ = get_pillow_tools()
-    title_font = load_quote_font(34, bold=True)
-    header_font = load_quote_font(18, bold=True)
-    body_font = load_quote_font(17)
-    small_font = load_quote_font(14)
+    title_font = load_quote_font(32, bold=True)
+    header_font = load_quote_font(17, bold=True)
+    body_font = load_quote_font(16)
+    small_font = load_quote_font(13)
 
     margin = 40
     table_width = 1120
-    col_widths = [330, 170, 290, 140, 190]
+    col_widths = [190, 320, 290, 120, 200]
     title_height = 76
     header_height = 48
-    row_height = 150
+    row_height = 210
     footer_height = 42
     width = table_width + margin * 2
     height = margin + title_height + header_height + row_height * len(rows) + footer_height + margin
@@ -1086,7 +1086,7 @@ def build_quote_image(rows):
     draw.text((margin + 20, margin + 18), "报价单", font=title_font, fill="#111827")
     draw.text((margin + table_width - 230, margin + 31), datetime.now().strftime("%Y-%m-%d %H:%M"), font=small_font, fill="#6b7280")
 
-    headers = ["货物名称", "图片", "尺寸", "数量", "价格"]
+    headers = ["名称", "图片", "尺寸", "数量", "价格"]
     y = margin + title_height
     x = margin
     for index, header in enumerate(headers):
@@ -1101,22 +1101,28 @@ def build_quote_image(rows):
             draw.rectangle((x, y, x + width_value, y + row_height), fill="#ffffff", outline="#e5e7eb")
             x += width_value
 
-        draw_wrapped_text(draw, row["name"], (margin + 12, y + 20), body_font, "#111827", col_widths[0] - 24, 24, max_lines=4)
+        draw_wrapped_text(draw, row["name"], (margin + 12, y + 18), body_font, "#111827", col_widths[0] - 24, 24, max_lines=6)
 
         thumb = open_quote_image(row["image_url"])
         image_cell_x = margin + col_widths[0]
         if thumb:
-            image.paste(thumb, (image_cell_x + 25, y + 15))
+            thumb_x = image_cell_x + (col_widths[1] - thumb.width) // 2
+            thumb_y = y + (row_height - thumb.height) // 2
+            image.paste(thumb, (thumb_x, thumb_y))
         else:
-            draw.rectangle((image_cell_x + 25, y + 15, image_cell_x + 145, y + 135), fill="#f3f4f6", outline="#d1d5db")
-            draw.text((image_cell_x + 55, y + 66), "无图", font=small_font, fill="#6b7280")
+            empty_x0 = image_cell_x + 30
+            empty_y0 = y + 24
+            empty_x1 = image_cell_x + col_widths[1] - 30
+            empty_y1 = y + row_height - 24
+            draw.rectangle((empty_x0, empty_y0, empty_x1, empty_y1), fill="#f3f4f6", outline="#d1d5db")
+            draw.text((empty_x0 + 76, empty_y0 + 72), "无图", font=small_font, fill="#6b7280")
 
         size_x = margin + col_widths[0] + col_widths[1]
-        draw_wrapped_text(draw, row["size"], (size_x + 12, y + 20), body_font, "#374151", col_widths[2] - 24, 24, max_lines=4)
+        draw_wrapped_text(draw, row["size"], (size_x + 12, y + 18), body_font, "#374151", col_widths[2] - 24, 24, max_lines=6)
         qty_x = size_x + col_widths[2]
-        draw_wrapped_text(draw, row["quantity"], (qty_x + 12, y + 20), body_font, "#374151", col_widths[3] - 24, 24, max_lines=2)
+        draw_wrapped_text(draw, row["quantity"], (qty_x + 12, y + 18), body_font, "#374151", col_widths[3] - 24, 24, max_lines=2)
         price_x = qty_x + col_widths[3]
-        draw_wrapped_text(draw, row["price"], (price_x + 12, y + 20), body_font, "#374151", col_widths[4] - 24, 24, max_lines=2)
+        draw_wrapped_text(draw, row["price"], (price_x + 12, y + 18), body_font, "#374151", col_widths[4] - 24, 24, max_lines=3)
         y += row_height
 
     draw.text((margin + 20, y + 18), "此报价单由当前页面临时生成，系统内不保存。", font=small_font, fill="#6b7280")
