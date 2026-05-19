@@ -40,6 +40,33 @@ def ensure_schema():
         if "category" not in columns:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE showcase_items ADD COLUMN category VARCHAR DEFAULT '未分类'"))
+        if "item_code" not in columns:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE showcase_items ADD COLUMN item_code VARCHAR DEFAULT ''"))
+        with engine.begin() as conn:
+            rows = conn.execute(text(
+                "SELECT id, COALESCE(category, '未分类') AS category "
+                "FROM showcase_items "
+                "WHERE item_code IS NULL OR item_code = '' "
+                "ORDER BY COALESCE(category, '未分类') ASC, created_at ASC, id ASC"
+            )).fetchall()
+            counter_rows = conn.execute(text(
+                "SELECT COALESCE(category, '未分类') AS category, COUNT(*) AS item_count "
+                "FROM showcase_items "
+                "WHERE item_code IS NOT NULL AND item_code != '' "
+                "GROUP BY COALESCE(category, '未分类')"
+            )).fetchall()
+            counters = {
+                (row._mapping["category"] or "未分类").strip() or "未分类": row._mapping["item_count"]
+                for row in counter_rows
+            }
+            for row in rows:
+                category = (row._mapping["category"] or "未分类").strip() or "未分类"
+                counters[category] = counters.get(category, 0) + 1
+                conn.execute(
+                    text("UPDATE showcase_items SET item_code = :code WHERE id = :id"),
+                    {"code": f"{category}-{counters[category]:03d}", "id": row._mapping["id"]}
+                )
     if "orders" in inspector.get_table_names():
         with engine.begin() as conn:
             conn.execute(text("UPDATE orders SET payment_status = '未付款' WHERE payment_status = '部分付款'"))
@@ -377,8 +404,7 @@ def get_recent_distinct_values(db: Session, column, keyword: str = "", limit: in
 
 
 def get_showcase_category_options(db: Session):
-    defaults = ["门头", "展架", "亚克力", "喷绘", "名片", "其他", "未分类"]
-    existing = [
+    return [
         row[0]
         for row in db.query(ShowcaseItem.category)
         .filter(ShowcaseItem.category != None, ShowcaseItem.category != "")
@@ -387,11 +413,23 @@ def get_showcase_category_options(db: Session):
         .all()
         if row[0]
     ]
-    ordered = []
-    for category in existing + defaults:
-        if category not in ordered:
-            ordered.append(category)
-    return ordered
+
+
+def generate_showcase_item_code(db: Session, category: str) -> str:
+    category_value = category.strip() or "未分类"
+    existing_count = (
+        db.query(ShowcaseItem)
+        .filter(ShowcaseItem.category == category_value)
+        .count()
+    )
+    return f"{category_value}-{existing_count + 1:03d}"
+
+
+def safe_redirect_path(return_to: str, default: str) -> str:
+    return_to = str(return_to or "")
+    if return_to.startswith("/") and not return_to.startswith("//"):
+        return return_to
+    return default
 
 
 def get_print_status_label(status: str):
@@ -1773,7 +1811,11 @@ def edit_order_submit(
 # ========================
 
 @app.post("/orders/{order_id}/print")
-def mark_order_printed(request: Request, order_id: int):
+def mark_order_printed(
+    request: Request,
+    order_id: int,
+    return_to: str = Form("")
+):
     db: Session = SessionLocal()
     try:
         redirect = require_login(request)
@@ -1793,7 +1835,7 @@ def mark_order_printed(request: Request, order_id: int):
         )
         db.commit()
 
-        return RedirectResponse(url=f"/orders/{order_id}", status_code=303)
+        return RedirectResponse(url=safe_redirect_path(return_to, f"/orders/{order_id}"), status_code=303)
     finally:
         db.close()
 
@@ -1801,7 +1843,8 @@ def mark_order_printed(request: Request, order_id: int):
 @app.post("/orders/batch-print")
 def batch_print_orders(
     request: Request,
-    order_ids: list[int] = Form(default=[])
+    order_ids: list[int] = Form(default=[]),
+    return_to: str = Form("/orders")
 ):
     db: Session = SessionLocal()
     try:
@@ -1824,7 +1867,7 @@ def batch_print_orders(
             )
             db.commit()
 
-        return RedirectResponse(url="/orders", status_code=303)
+        return RedirectResponse(url=safe_redirect_path(return_to, "/orders"), status_code=303)
     finally:
         db.close()
 
@@ -1992,6 +2035,14 @@ def print_jobs_page(request: Request, status: str = ""):
             item_status: db.query(PrintJob).filter(PrintJob.status == item_status).count()
             for item_status in ["pending", "printing", "failed", "done"]
         }
+        candidate_orders = (
+            db.query(Order)
+            .filter(Order.print_status == "未打印")
+            .order_by(Order.order_no.desc())
+            .limit(100)
+            .all()
+        )
+        available_orders = [order for order in candidate_orders if get_active_print_job(db, order.id) is None]
 
         return templates.TemplateResponse(
             request=request,
@@ -2000,6 +2051,7 @@ def print_jobs_page(request: Request, status: str = ""):
                 "jobs": jobs,
                 "status": status,
                 "status_counts": status_counts,
+                "available_orders": available_orders,
                 "current_user": current_user,
                 "status_labels": {
                     "pending": "等待打印",
@@ -2009,6 +2061,32 @@ def print_jobs_page(request: Request, status: str = ""):
                 },
             }
         )
+    finally:
+        db.close()
+
+
+@app.post("/print-jobs/add-order")
+def add_order_to_print_queue(
+    request: Request,
+    order_id: int = Form(...)
+):
+    db: Session = SessionLocal()
+    try:
+        redirect = require_login(request)
+        if redirect:
+            return redirect
+
+        current_user = get_current_user(request, db)
+        order = db.query(Order).filter(Order.id == order_id).first()
+        if order is not None:
+            queue_print_jobs(
+                db,
+                [order],
+                operator=current_user.username if current_user else ""
+            )
+            db.commit()
+
+        return RedirectResponse(url="/print-jobs?status=pending", status_code=303)
     finally:
         db.close()
 
@@ -2052,7 +2130,11 @@ def retry_print_job(request: Request, job_id: int):
 
 
 @app.post("/orders/{order_id}/paid")
-def mark_order_paid(request: Request, order_id: int):
+def mark_order_paid(
+    request: Request,
+    order_id: int,
+    return_to: str = Form("")
+):
     db: Session = SessionLocal()
     try:
         redirect = require_login(request)
@@ -2079,13 +2161,17 @@ def mark_order_paid(request: Request, order_id: int):
 
             db.commit()
 
-        return RedirectResponse(url=f"/orders/{order_id}", status_code=303)
+        return RedirectResponse(url=safe_redirect_path(return_to, f"/orders/{order_id}"), status_code=303)
     finally:
         db.close()
 
 
 @app.post("/orders/{order_id}/unpaid")
-def mark_order_unpaid(request: Request, order_id: int):
+def mark_order_unpaid(
+    request: Request,
+    order_id: int,
+    return_to: str = Form("")
+):
     db: Session = SessionLocal()
     try:
         redirect = require_login(request)
@@ -2115,7 +2201,7 @@ def mark_order_unpaid(request: Request, order_id: int):
 
             db.commit()
 
-        return RedirectResponse(url=f"/orders/{order_id}", status_code=303)
+        return RedirectResponse(url=safe_redirect_path(return_to, f"/orders/{order_id}"), status_code=303)
     finally:
         db.close()
 
@@ -2305,7 +2391,7 @@ def showcase_public(request: Request, category: str = ""):
         if category.strip():
             query = query.filter(ShowcaseItem.category == category.strip())
 
-        items = query.order_by(ShowcaseItem.sort_order.asc(), ShowcaseItem.id.desc()).all()
+        items = query.order_by(ShowcaseItem.category.asc(), ShowcaseItem.item_code.asc(), ShowcaseItem.id.asc()).all()
         categories = (
             db.query(ShowcaseItem.category)
             .filter(ShowcaseItem.is_visible == True)
@@ -2343,7 +2429,7 @@ def showcase_manage(request: Request, category: str = ""):
         query = db.query(ShowcaseItem)
         if category.strip():
             query = query.filter(ShowcaseItem.category == category.strip())
-        items = query.order_by(ShowcaseItem.sort_order.asc(), ShowcaseItem.id.desc()).all()
+        items = query.order_by(ShowcaseItem.category.asc(), ShowcaseItem.item_code.asc(), ShowcaseItem.id.asc()).all()
         categories = get_showcase_category_options(db)
 
         return templates.TemplateResponse(
@@ -2384,11 +2470,10 @@ def showcase_new_page(request: Request):
 def showcase_new_submit(
     request: Request,
     title: str = Form(...),
-    category: str = Form("未分类"),
+    category: str = Form(""),
     image_url: str = Form(""),
     image_file: UploadFile = File(None),
     description: str = Form(""),
-    sort_order: int = Form(0),
     is_visible: str = Form("true")
 ):
     db: Session = SessionLocal()
@@ -2409,12 +2494,13 @@ def showcase_new_submit(
                 status_code=400
             )
 
+        category_value = category.strip() or "未分类"
         item = ShowcaseItem(
             title=title.strip(),
-            category=category.strip() or "未分类",
+            item_code=generate_showcase_item_code(db, category_value),
+            category=category_value,
             image_url=uploaded_url or image_url.strip(),
             description=description.strip(),
-            sort_order=sort_order,
             is_visible=(is_visible == "true")
         )
 

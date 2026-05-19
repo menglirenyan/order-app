@@ -45,7 +45,7 @@
 
                 <div>
                     <label>类别</label>
-                    <input type="text" name="category" list="category-options" value="未分类" required>
+                    <input type="text" name="category" list="category-options" placeholder="输入新类别或选择已有类别">
                     <datalist id="category-options">
                         {% for category in categories %}
                         <option value="{{ category }}"></option>
@@ -59,8 +59,8 @@
                 </div>
 
                 <div>
-                    <label>排序</label>
-                    <input type="number" name="sort_order" value="0">
+                    <label>唯一号</label>
+                    <input type="text" value="保存后自动生成" disabled>
                 </div>
 
                 <div class="full-width">

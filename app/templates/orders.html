@@ -31,26 +31,13 @@
                 <h1>订单列表</h1>
                 <p>默认显示未打印订单；打印成功后单子结束</p>
             </div>
-        </div>
-
-        <div class="voice-panel query-voice-panel">
-            <button class="voice-icon-button" type="button" id="query-voice-btn" aria-label="语音查询" title="语音查询">
-                <span class="voice-icon" aria-hidden="true"></span>
-            </button>
-            <p id="query-voice-status">点麦克风说查询条件，识别后会直接执行筛选。</p>
-            <textarea id="query-voice-text" rows="2" placeholder="例如：查方圆本月未付款订单，按待结金额高到低"></textarea>
-            <div class="voice-actions">
-                <button class="btn-secondary" type="button" id="parse-query-text-btn">解析查询</button>
-                <button class="btn-secondary" type="button" id="clear-query-draft-btn">清空</button>
-            </div>
-            <div class="query-draft-card" id="query-draft-card" hidden>
-                <div class="query-draft-title">已执行筛选条件</div>
-                <div class="query-draft-fields" id="query-draft-fields"></div>
-                <div class="draft-message" id="query-draft-message"></div>
+            <div class="page-actions mobile-compact-actions">
+                <button class="btn-secondary" type="button" id="open-query-voice-modal">语音筛选</button>
+                <a class="btn-primary" href="/orders/new">新建订单</a>
             </div>
         </div>
 
-        <div class="card filter-card">
+        <div class="card filter-card compact-filter-card">
             <form method="get" action="/orders" class="filter-form" id="order-filter-form">
                 <input type="text" name="keyword" id="filter-keyword" value="{{ keyword }}" placeholder="搜索：订单号/客户/商品/尺寸/备注">
 
@@ -93,7 +80,7 @@
             </div>
         </div>
         
-        <div class="card">
+        <div class="card compact-summary-card">
             <div class="summary-row">
                 <div class="summary-item">
                     <div class="summary-label">当前结果总金额</div>
@@ -107,9 +94,10 @@
             </div>
         </div>
 
-        <div class="card">
+        <div class="card order-results-card">
             {% if orders %}
             <form action="/orders/batch-print" method="post" id="batch-print-form">
+            <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
             <div class="bulk-print-bar">
                 <div class="bulk-print-actions">
                     <button class="btn-secondary" type="button" id="select-all-print">全选未打印</button>
@@ -157,6 +145,7 @@
                 {% endfor %}
                 </tbody>
             </table>
+            </form>
             <div class="mobile-order-list">
                 {% for order in orders %}
                 <article class="mobile-order-card" data-mobile-toggle-card>
@@ -189,18 +178,28 @@
                         </div>
                         <div class="mobile-card-actions">
                             {% if order.print_status == "未打印" %}
-                            <label class="mobile-print-select">
-                                <input class="print-order-checkbox" type="checkbox" name="order_ids" value="{{ order.id }}">
-                                选择打印
-                            </label>
+                            <form action="/orders/{{ order.id }}/print" method="post" onsubmit="return confirm('确认加入打印队列？');">
+                                <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+                                <button class="btn-primary mobile-order-action" type="submit">加入打印队列</button>
+                            </form>
                             {% endif %}
-                            <a class="btn-secondary mobile-order-action" href="/orders/{{ order.id }}">查看</a>
+                            {% if order.payment_status == "未付款" %}
+                            <form action="/orders/{{ order.id }}/paid" method="post" onsubmit="return confirm('确认该订单已结清？');">
+                                <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+                                <button class="btn-secondary mobile-order-action" type="submit">标记已付款</button>
+                            </form>
+                            {% else %}
+                            <form action="/orders/{{ order.id }}/unpaid" method="post" onsubmit="return confirm('确认改回未付款？');">
+                                <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+                                <button class="btn-secondary mobile-order-action" type="submit">改回未付款</button>
+                            </form>
+                            {% endif %}
+                            <a class="btn-secondary mobile-order-action" href="/orders/{{ order.id }}/edit">修改订单</a>
                         </div>
                     </div>
                 </article>
                 {% endfor %}
             </div>
-            </form>
             {% else %}
             <div class="empty-box">没有匹配的订单。</div>
             {% endif %}
@@ -213,6 +212,35 @@
     <a class="active" href="/orders">订单</a>
     <a href="/orders/new">新建</a>
 </nav>
+
+<div class="app-modal" id="queryVoiceModal" hidden>
+    <div class="app-modal-backdrop" data-close-query-modal></div>
+    <div class="app-modal-panel compact-voice-modal" role="dialog" aria-modal="true" aria-labelledby="queryVoiceTitle">
+        <div class="app-modal-head">
+            <div>
+                <h2 id="queryVoiceTitle">语音筛选订单</h2>
+                <p>说出客户、日期、付款或打印状态，会自动执行筛选。</p>
+            </div>
+            <button class="btn-secondary" type="button" data-close-query-modal>关闭</button>
+        </div>
+        <div class="voice-panel query-voice-panel">
+            <button class="voice-icon-button" type="button" id="query-voice-btn" aria-label="语音查询" title="语音查询">
+                <span class="voice-icon" aria-hidden="true"></span>
+            </button>
+            <p id="query-voice-status">点麦克风说查询条件，识别后会直接执行筛选。</p>
+            <textarea id="query-voice-text" rows="2" placeholder="例如：查方圆本月未付款订单，按待结金额高到低"></textarea>
+            <div class="voice-actions">
+                <button class="btn-primary" type="button" id="parse-query-text-btn">解析查询</button>
+                <button class="btn-secondary" type="button" id="clear-query-draft-btn">清空</button>
+            </div>
+            <div class="query-draft-card" id="query-draft-card" hidden>
+                <div class="query-draft-title">已执行筛选条件</div>
+                <div class="query-draft-fields" id="query-draft-fields"></div>
+                <div class="draft-message" id="query-draft-message"></div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script>
 function pad(num) {
@@ -300,6 +328,16 @@ if (batchPrintForm) {
 
     updateBatchPrintState();
 }
+
+const queryVoiceModal = document.getElementById("queryVoiceModal");
+document.getElementById("open-query-voice-modal").addEventListener("click", () => {
+    queryVoiceModal.hidden = false;
+});
+document.querySelectorAll("[data-close-query-modal]").forEach(item => {
+    item.addEventListener("click", () => {
+        queryVoiceModal.hidden = true;
+    });
+});
 
 const queryFieldMap = {
     keyword: "filter-keyword",

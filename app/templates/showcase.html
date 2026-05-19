@@ -36,7 +36,10 @@
             <div class="showcase-image-frame showcase-image-empty">暂无图片</div>
             {% endif %}
             <div class="showcase-card-body">
-                <div class="showcase-category">{{ item.category or "未分类" }}</div>
+                <div class="manage-product-meta">
+                    <span class="showcase-category">{{ item.category or "未分类" }}</span>
+                    <span class="showcase-code">{{ item.item_code or ("#" ~ item.id) }}</span>
+                </div>
                 <h3>{{ item.title }}</h3>
                 {% if item.description %}
                 <p>{{ item.description }}</p>

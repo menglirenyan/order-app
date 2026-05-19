@@ -33,21 +33,10 @@
                 <h1>新建订单</h1>
                 <p>订单号将自动生成：{{ next_order_no }}</p>
             </div>
-            <button class="btn-secondary install-button" type="button" id="install-app-btn" hidden>添加到桌面</button>
-        </div>
-
-        <div class="voice-panel">
-            <button class="voice-icon-button" type="button" id="voice-btn" aria-label="语音下单" title="语音下单">
-                <span class="voice-icon" aria-hidden="true"></span>
-            </button>
-            <p id="voice-status">点麦克风说订单，识别后会自动填入表单。</p>
-            <textarea id="voice-text" rows="3" placeholder="例如：给张三做亚克力牌 30x40 两个，单价 80，定金 50，明天要，加急"></textarea>
-            <div class="voice-actions">
-                <button class="btn-secondary" type="button" id="parse-text-btn">解析文字</button>
-                <button class="btn-secondary" type="button" id="clear-draft-btn">清空语音</button>
+            <div class="page-actions mobile-compact-actions">
+                <button class="btn-secondary" type="button" id="open-voice-modal">语音创建</button>
+                <button class="btn-secondary install-button" type="button" id="install-app-btn" hidden>添加到桌面</button>
             </div>
-            <div class="draft-message" id="draft-message" hidden></div>
-            <div class="draft-list" id="draft-list" hidden></div>
         </div>
 
         <div class="card mobile-form-card">
@@ -148,6 +137,32 @@
     <a href="/orders">订单</a>
     <a class="active" href="/orders/new">新建</a>
 </nav>
+
+<div class="app-modal" id="voiceModal" hidden>
+    <div class="app-modal-backdrop" data-close-voice-modal></div>
+    <div class="app-modal-panel compact-voice-modal" role="dialog" aria-modal="true" aria-labelledby="voiceModalTitle">
+        <div class="app-modal-head">
+            <div>
+                <h2 id="voiceModalTitle">语音创建订单</h2>
+                <p>说出客户、商品、尺寸、数量、价格、定金和备注。</p>
+            </div>
+            <button class="btn-secondary" type="button" data-close-voice-modal>关闭</button>
+        </div>
+        <div class="voice-panel">
+            <button class="voice-icon-button" type="button" id="voice-btn" aria-label="语音下单" title="语音下单">
+                <span class="voice-icon" aria-hidden="true"></span>
+            </button>
+            <p id="voice-status">点麦克风说订单，识别后会自动填入表单。</p>
+            <textarea id="voice-text" rows="3" placeholder="例如：给张三做亚克力牌 30x40 两个，单价 80，定金 50，明天要，加急"></textarea>
+            <div class="voice-actions">
+                <button class="btn-primary" type="button" id="parse-text-btn">解析文字</button>
+                <button class="btn-secondary" type="button" id="clear-draft-btn">清空语音</button>
+            </div>
+            <div class="draft-message" id="draft-message" hidden></div>
+            <div class="draft-list" id="draft-list" hidden></div>
+        </div>
+    </div>
+</div>
 
 <script>
 async function bindSuggest(inputId, boxId, fieldName) {
@@ -380,6 +395,16 @@ document.getElementById("install-app-btn").addEventListener("click", async () =>
 if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/static/sw.js");
 }
+
+const voiceModal = document.getElementById("voiceModal");
+document.getElementById("open-voice-modal").addEventListener("click", () => {
+    voiceModal.hidden = false;
+});
+document.querySelectorAll("[data-close-voice-modal]").forEach(item => {
+    item.addEventListener("click", () => {
+        voiceModal.hidden = true;
+    });
+});
 
 bindSuggest("customer-input", "customer-suggest", "customer");
 bindSuggest("item-input", "item-suggest", "item_name");

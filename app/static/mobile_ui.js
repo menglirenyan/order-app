@@ -48,7 +48,14 @@
     }
   });
 
-  if (!window.location.pathname.startsWith("/orders/new")) {
+  const path = window.location.pathname;
+  const shouldShowNewOrder = (
+    path === "/dashboard"
+    || path === "/orders"
+    || /^\/orders\/\d+/.test(path)
+  ) && !path.includes("/edit");
+
+  if (shouldShowNewOrder) {
     const newOrderButton = document.createElement("a");
     newOrderButton.className = "mobile-new-order-fab";
     newOrderButton.href = "/orders/new";

@@ -61,6 +61,7 @@ class ShowcaseItem(Base):
     __tablename__ = "showcase_items"
 
     id = Column(Integer, primary_key=True, index=True)
+    item_code = Column(String, default="", index=True)
     title = Column(String, nullable=False)
     category = Column(String, default="未分类", index=True)
     image_url = Column(String, default="")

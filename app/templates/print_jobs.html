@@ -31,7 +31,21 @@
                 <h1>打印队列</h1>
                 <p>查看 Win7 客户端领取、失败和完成的打印任务。</p>
             </div>
-            <a class="btn-secondary" href="/orders">返回订单</a>
+            <div class="page-actions">
+                <a class="btn-secondary" href="/orders">返回订单</a>
+            </div>
+        </div>
+
+        <div class="card compact-print-picker">
+            <form action="/print-jobs/add-order" method="post" class="inline-picker-form">
+                <select name="order_id" required>
+                    <option value="">选择已有未打印订单加入队列</option>
+                    {% for order in available_orders %}
+                    <option value="{{ order.id }}">{{ order.order_no }} · {{ order.customer }} · {{ order.item_name }}</option>
+                    {% endfor %}
+                </select>
+                <button class="btn-primary" type="submit">加入打印队列</button>
+            </form>
         </div>
 
         <div class="print-status-tabs">
@@ -45,7 +59,7 @@
 
         <div class="card">
             {% if jobs %}
-            <table class="data-table">
+            <table class="data-table print-jobs-table">
                 <thead>
                     <tr>
                         <th>任务</th>
@@ -67,7 +81,7 @@
                     {% set order = item.order %}
                     <tr>
                         <td>#{{ job.id }}</td>
-                        <td><a class="btn-link" href="/orders/{{ order.id }}">{{ order.order_no }}</a></td>
+                        <td><a class="btn-link" href="/orders/{{ order.id }}/edit">{{ order.order_no }}</a></td>
                         <td>{{ order.customer }}</td>
                         <td>{{ order.item_name }}</td>
                         <td><span class="status-badge print-job-{{ job.status }}">{{ item.status_label }}</span></td>
@@ -82,7 +96,7 @@
                                 <button class="btn-secondary" type="submit">重新打印</button>
                             </form>
                             {% else %}
-                            <span class="muted-text">-</span>
+                            <a class="btn-link" href="/orders/{{ order.id }}/edit">修改订单</a>
                             {% endif %}
                         </td>
                     </tr>
@@ -95,6 +109,42 @@
                 {% endfor %}
                 </tbody>
             </table>
+            <div class="mobile-order-list print-job-mobile-list">
+                {% for item in jobs %}
+                {% set job = item.job %}
+                {% set order = item.order %}
+                <article class="mobile-order-card" data-mobile-toggle-card>
+                    <div class="mobile-order-head">
+                        <strong>#{{ job.id }} · {{ order.order_no }}</strong>
+                        <span>{{ item.status_label }}</span>
+                    </div>
+                    <div class="mobile-order-summary">
+                        <div class="mobile-order-main">
+                            <div class="mobile-order-title">{{ order.customer }} - {{ order.item_name }}</div>
+                            <div class="mobile-order-subtitle">次数：{{ job.attempts or 0 }} · 客户端：{{ job.client_id or "-" }}</div>
+                        </div>
+                        <span class="status-badge print-job-{{ job.status }}">{{ item.status_label }}</span>
+                    </div>
+                    <div class="mobile-order-more">点击查看时间和错误信息</div>
+                    <div class="mobile-order-details">
+                        <div class="mobile-order-meta">
+                            <span>创建：{{ job.created_at.strftime("%Y-%m-%d %H:%M") if job.created_at else "-" }}</span>
+                            <span>领取：{{ job.claimed_at.strftime("%Y-%m-%d %H:%M") if job.claimed_at else "-" }}</span>
+                            <span>完成：{{ job.printed_at.strftime("%Y-%m-%d %H:%M") if job.printed_at else "-" }}</span>
+                            <span>错误：{{ job.error_message or "无" }}</span>
+                        </div>
+                        <div class="mobile-card-actions">
+                            {% if job.status == "failed" %}
+                            <form action="/print-jobs/{{ job.id }}/retry" method="post" onsubmit="return confirm('确认重新加入打印队列？');">
+                                <button class="btn-primary mobile-order-action" type="submit">重新打印</button>
+                            </form>
+                            {% endif %}
+                            <a class="btn-secondary mobile-order-action" href="/orders/{{ order.id }}/edit">修改订单</a>
+                        </div>
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
             {% else %}
             <div class="empty-box">暂无打印任务。</div>
             {% endif %}

@@ -68,7 +68,15 @@
                         <td>{{ order.paid_amount }}</td>
                         <td>{{ order.unpaid_amount }}</td>
                         <td><span class="status-badge status-payment-{{ order.payment_status }}">{{ order.payment_status }}</span></td>
-                        <td><a class="btn-link" href="/orders/{{ order.id }}">查看</a></td>
+                        <td>
+                            <div class="table-action-row">
+                                <form action="/orders/{{ order.id }}/print" method="post" onsubmit="return confirm('确认加入打印队列？');">
+                                    <input type="hidden" name="return_to" value="/dashboard">
+                                    <button class="btn-secondary" type="submit">打印</button>
+                                </form>
+                                <a class="btn-link" href="/orders/{{ order.id }}/edit">修改</a>
+                            </div>
+                        </td>
                     </tr>
                 {% endfor %}
                 </tbody>
@@ -105,7 +113,22 @@
                             <span>备注：{{ order.remark or "无" }}</span>
                         </div>
                         <div class="mobile-card-actions">
-                            <a class="btn-secondary mobile-order-action" href="/orders/{{ order.id }}">查看</a>
+                            <form action="/orders/{{ order.id }}/print" method="post" onsubmit="return confirm('确认加入打印队列？');">
+                                <input type="hidden" name="return_to" value="/dashboard">
+                                <button class="btn-primary mobile-order-action" type="submit">加入打印队列</button>
+                            </form>
+                            {% if order.payment_status == "未付款" %}
+                            <form action="/orders/{{ order.id }}/paid" method="post" onsubmit="return confirm('确认该订单已结清？');">
+                                <input type="hidden" name="return_to" value="/dashboard">
+                                <button class="btn-secondary mobile-order-action" type="submit">标记已付款</button>
+                            </form>
+                            {% else %}
+                            <form action="/orders/{{ order.id }}/unpaid" method="post" onsubmit="return confirm('确认改回未付款？');">
+                                <input type="hidden" name="return_to" value="/dashboard">
+                                <button class="btn-secondary mobile-order-action" type="submit">改回未付款</button>
+                            </form>
+                            {% endif %}
+                            <a class="btn-secondary mobile-order-action" href="/orders/{{ order.id }}/edit">修改订单</a>
                         </div>
                     </div>
                 </article>
