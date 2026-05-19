@@ -938,6 +938,8 @@ def save_showcase_upload(image_file: UploadFile | None):
 
             resized = ImageOps.fit(source, SHOWCASE_IMAGE_SIZE, method=Image.Resampling.LANCZOS)
             resized.save(target, format="JPEG", quality=88, optimize=True)
+    except PermissionError as exc:
+        raise ValueError("上传目录没有写入权限，请联系管理员修复 app/static/uploads 权限") from exc
     except Exception as exc:
         raise ValueError("图片处理失败，请确认文件是有效图片") from exc
 
@@ -2471,7 +2473,6 @@ def showcase_new_submit(
     request: Request,
     title: str = Form(...),
     category: str = Form(""),
-    image_url: str = Form(""),
     image_file: UploadFile = File(None),
     description: str = Form(""),
     is_visible: str = Form("true")
@@ -2499,7 +2500,7 @@ def showcase_new_submit(
             title=title.strip(),
             item_code=generate_showcase_item_code(db, category_value),
             category=category_value,
-            image_url=uploaded_url or image_url.strip(),
+            image_url=uploaded_url,
             description=description.strip(),
             is_visible=(is_visible == "true")
         )
