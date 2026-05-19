@@ -29,6 +29,7 @@
                 <p>当前用户：{{ user_obj.username }}</p>
             </div>
         </div>
+        {% include "_flash.html" %}
 
         <div class="card">
             {% if error %}

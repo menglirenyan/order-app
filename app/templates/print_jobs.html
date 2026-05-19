@@ -35,6 +35,7 @@
                 <a class="btn-secondary" href="/orders">返回订单</a>
             </div>
         </div>
+        {% include "_flash.html" %}
 
         <div class="card compact-print-picker">
             <form action="/print-jobs/add-order" method="post" class="inline-picker-form">
@@ -42,6 +43,11 @@
                     <option value="">选择已有未打印订单加入队列</option>
                     {% for order in available_orders %}
                     <option value="{{ order.id }}">{{ order.order_no }} · {{ order.customer }} · {{ order.item_name }}</option>
+                    {% endfor %}
+                </select>
+                <select name="print_template" class="template-select" aria-label="打印模板">
+                    {% for key, item in print_templates.items() %}
+                    <option value="{{ key }}">{{ item.label }}</option>
                     {% endfor %}
                 </select>
                 <button class="btn-primary" type="submit">加入打印队列</button>
@@ -67,6 +73,7 @@
                         <th>客户</th>
                         <th>商品</th>
                         <th>状态</th>
+                        <th>模板</th>
                         <th>客户端</th>
                         <th>次数</th>
                         <th>创建时间</th>
@@ -85,6 +92,7 @@
                         <td>{{ order.customer }}</td>
                         <td>{{ order.item_name }}</td>
                         <td><span class="status-badge print-job-{{ job.status }}">{{ item.status_label }}</span></td>
+                        <td>{{ print_template_label(job.print_template) }}</td>
                         <td>{{ job.client_id or "-" }}</td>
                         <td>{{ job.attempts or 0 }}</td>
                         <td>{{ job.created_at.strftime("%Y-%m-%d %H:%M") if job.created_at else "-" }}</td>
@@ -103,7 +111,7 @@
                     {% if job.error_message %}
                     <tr class="job-error-row">
                         <td></td>
-                        <td colspan="10">{{ job.error_message }}</td>
+                        <td colspan="11">{{ job.error_message }}</td>
                     </tr>
                     {% endif %}
                 {% endfor %}
@@ -131,6 +139,7 @@
                             <span>创建：{{ job.created_at.strftime("%Y-%m-%d %H:%M") if job.created_at else "-" }}</span>
                             <span>领取：{{ job.claimed_at.strftime("%Y-%m-%d %H:%M") if job.claimed_at else "-" }}</span>
                             <span>完成：{{ job.printed_at.strftime("%Y-%m-%d %H:%M") if job.printed_at else "-" }}</span>
+                            <span>模板：{{ print_template_label(job.print_template) }}</span>
                             <span>错误：{{ job.error_message or "无" }}</span>
                         </div>
                         <div class="mobile-card-actions">

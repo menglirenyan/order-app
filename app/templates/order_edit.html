@@ -31,26 +31,34 @@
                 <p>订单号：{{ order.order_no }}</p>
             </div>
         </div>
+        {% include "_flash.html" %}
 
         <div class="card mobile-form-card">
+            {% if errors %}
+            <ul class="form-error-list">
+                {% for error in errors %}
+                <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
             <form action="/orders/{{ order.id }}/edit" method="post" class="mobile-order-form">
                 <div class="form-item">
                     <label>客户名称 <span class="required-star">*</span></label>
                     <div class="suggest-wrap">
-                        <input type="text" name="customer" id="customer-input" value="{{ order.customer }}" autocomplete="off" required>
+                        <input type="text" name="customer" id="customer-input" value="{{ form_data.get('customer', order.customer) if form_data is defined else order.customer }}" autocomplete="off" required>
                         <div class="suggest-box" id="customer-suggest"></div>
                     </div>
                 </div>
 
                 <div class="form-item form-item-small">
                     <label>联系电话</label>
-                    <input type="text" name="phone" value="{{ order.phone }}" inputmode="tel" autocomplete="tel">
+                    <input type="text" name="phone" value="{{ form_data.get('phone', order.phone) if form_data is defined else order.phone }}" inputmode="tel" autocomplete="tel">
                 </div>
 
                 <div class="form-item">
                     <label>商品名称 <span class="required-star">*</span></label>
                     <div class="suggest-wrap">
-                        <input type="text" name="item_name" id="item-input" value="{{ order.item_name }}" autocomplete="off" required>
+                        <input type="text" name="item_name" id="item-input" value="{{ form_data.get('item_name', order.item_name) if form_data is defined else order.item_name }}" autocomplete="off" required>
                         <div class="suggest-box" id="item-suggest"></div>
                     </div>
                 </div>
@@ -58,47 +66,48 @@
                 <div class="form-item">
                     <label>尺寸</label>
                     <div class="suggest-wrap">
-                        <input type="text" name="size" id="size-input" value="{{ order.size }}" autocomplete="off">
+                        <input type="text" name="size" id="size-input" value="{{ form_data.get('size', order.size) if form_data is defined else order.size }}" autocomplete="off">
                         <div class="suggest-box" id="size-suggest"></div>
                     </div>
                 </div>
 
                 <div class="form-item">
                     <label>数量 <span class="required-star">*</span></label>
-                    <input type="number" name="quantity" min="1" step="1" value="{{ order.quantity }}" required>
+                    <input type="number" name="quantity" min="1" step="1" value="{{ form_data.get('quantity', order.quantity) if form_data is defined else order.quantity }}" required>
                 </div>
 
                 <div class="form-item">
                     <label>单价 <span class="required-star">*</span></label>
-                    <input type="number" name="unit_price" step="0.01" min="0" value="{{ order.unit_price }}" required>
+                    <input type="number" name="unit_price" step="0.01" min="0" value="{{ form_data.get('unit_price', order.unit_price) if form_data is defined else order.unit_price }}" required>
                 </div>
 
                 <div class="form-item">
-                    <label>定金</label>
-                    <input type="number" name="paid_amount" step="0.01" min="0" value="{{ order.paid_amount }}">
-                    <small class="help-text">修改定金会重新计算未结清订单的待结金额。</small>
+                    <label>已收金额</label>
+                    <input type="number" name="paid_amount" step="0.01" min="0" value="{{ form_data.get('paid_amount', order.paid_amount) if form_data is defined else order.paid_amount }}">
+                    <small class="help-text">修改已收金额会重新计算未结清订单的待结金额。</small>
                 </div>
                 
                 <div class="form-item">
                     <label>优先级颜色</label>
                     <select name="priority_color">
-                        <option value="红色" {% if order.priority_color == "红色" %}selected{% endif %}>红色（最高）</option>
-                        <option value="橙色" {% if order.priority_color == "橙色" %}selected{% endif %}>橙色</option>
-                        <option value="黄色" {% if order.priority_color == "黄色" %}selected{% endif %}>黄色</option>
-                        <option value="蓝色" {% if order.priority_color == "蓝色" %}selected{% endif %}>蓝色</option>
-                        <option value="灰色" {% if order.priority_color == "灰色" %}selected{% endif %}>灰色（默认）</option>
+                        {% set selected_priority = form_data.get('priority_color', order.priority_color) if form_data is defined else order.priority_color %}
+                        <option value="红色" {% if selected_priority == "红色" %}selected{% endif %}>红色（最高）</option>
+                        <option value="橙色" {% if selected_priority == "橙色" %}selected{% endif %}>橙色</option>
+                        <option value="黄色" {% if selected_priority == "黄色" %}selected{% endif %}>黄色</option>
+                        <option value="蓝色" {% if selected_priority == "蓝色" %}selected{% endif %}>蓝色</option>
+                        <option value="灰色" {% if selected_priority == "灰色" %}selected{% endif %}>灰色（默认）</option>
                     </select>
                 </div>
 
                 <div class="form-item">
                     <label>截至日期</label>
-                    <input type="date" name="due_date" value="{{ order.due_date }}">
+                    <input type="date" name="due_date" value="{{ form_data.get('due_date', order.due_date) if form_data is defined else order.due_date }}">
                     <small class="help-text">越接近截止日期，工作台中越靠前</small>
                 </div>
 
                 <div class="form-item">
                     <label>备注</label>
-                    <textarea name="remark" rows="4">{{ order.remark }}</textarea>
+                    <textarea name="remark" rows="4">{{ form_data.get('remark', order.remark) if form_data is defined else order.remark }}</textarea>
                 </div>
 
                 <div class="form-actions">

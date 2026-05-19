@@ -88,4 +88,22 @@
       toggleCard();
     });
   });
+
+  document.addEventListener("submit", (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || event.defaultPrevented) {
+      return;
+    }
+    if (form.dataset.submitting === "true") {
+      event.preventDefault();
+      return;
+    }
+    form.dataset.submitting = "true";
+    const submitter = event.submitter;
+    if (submitter && submitter instanceof HTMLButtonElement) {
+      submitter.dataset.originalText = submitter.textContent || "";
+      submitter.textContent = "处理中...";
+      submitter.disabled = true;
+    }
+  });
 })();

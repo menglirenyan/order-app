@@ -1,0 +1,8 @@
+{% set flashes = get_flashes(request) %}
+{% if flashes %}
+<div class="flash-stack">
+    {% for flash in flashes %}
+    <div class="flash-message flash-{{ flash.level or 'success' }}">{{ flash.message }}</div>
+    {% endfor %}
+</div>
+{% endif %}

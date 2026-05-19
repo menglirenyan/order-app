@@ -32,6 +32,7 @@
                 <p>当前用户：{{ current_user.username }}</p>
             </div>
         </div>
+        {% include "_flash.html" %}
 
         {% if pending_orders %}
         <div class="card">
@@ -45,7 +46,7 @@
                         <th>优先级</th>
                         <th>截至日期</th>
                         <th>备注</th>
-                        <th>定金</th>
+                        <th>已收</th>
                         <th>待结</th>
                         <th>付款状态</th>
                         <th>操作</th>
@@ -107,7 +108,7 @@
                             <span>尺寸：{{ order.size or "无" }}</span>
                             <span>优先级：{{ order.priority_color }}</span>
                             <span>截至：{{ order.due_date or "未设置" }}</span>
-                            <span>定金：{{ order.paid_amount }}</span>
+                            <span>已收：{{ order.paid_amount }}</span>
                             <span>待结：{{ order.unpaid_amount }}</span>
                             <span>付款：<span class="status-badge status-payment-{{ order.payment_status }}">{{ order.payment_status }}</span></span>
                             <span>备注：{{ order.remark or "无" }}</span>

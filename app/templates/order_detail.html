@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>订单详情</title>
     <link rel="stylesheet" href="/static/app.css">
     <script src="/static/mobile_ui.js" defer></script>
@@ -35,6 +36,7 @@
                 <a class="btn-secondary" href="/orders/{{ order.id }}/edit">编辑订单</a>
             </div>
         </div>
+        {% include "_flash.html" %}
 
         <div class="card detail-grid">
             <div><strong>客户：</strong>{{ order.customer }}</div>
@@ -44,7 +46,7 @@
             <div><strong>数量：</strong>{{ order.quantity }}</div>
             <div><strong>单价：</strong>{{ order.unit_price }}</div>
             <div><strong>总金额：</strong>{{ order.total_amount }}</div>
-            <div><strong>定金：</strong>{{ order.paid_amount }}</div>
+            <div><strong>已收金额：</strong>{{ order.paid_amount }}</div>
             <div><strong>待结金额：</strong>{{ order.unpaid_amount }}</div>
             <div><strong>付款状态：</strong><span class="status-badge status-payment-{{ order.payment_status }}">{{ order.payment_status }}</span></div>
             <div><strong>打印状态：</strong><span class="status-badge status-print-{{ order.print_status }}">{{ order.print_status }}</span></div>
@@ -54,8 +56,14 @@
         <div class="card action-row">
     {% if order.print_status == "未打印" %}
     <form action="/orders/{{ order.id }}/print" method="post" onsubmit="return confirm('确认发送到打印队列？Win7 客户端打印成功后才会标记为已打印。');">
+        <select name="print_template" class="compact-select" aria-label="打印模板">
+            {% for key, item in print_templates.items() %}
+            <option value="{{ key }}">{{ item.label }}</option>
+            {% endfor %}
+        </select>
         <button class="btn-primary" type="submit">发送到打印队列</button>
     </form>
+    <a class="btn-secondary" href="/orders/{{ order.id }}/print-preview">打印预览</a>
     {% endif %}
 
     {% if order.payment_status == "未付款" %}
@@ -76,6 +84,21 @@
         <button class="btn-danger" type="submit">删除订单</button>
     </form>
 </div>
+
+        {% if logs %}
+        <div class="card">
+            <h2 class="section-title">最近操作</h2>
+            <div class="log-list">
+                {% for log in logs %}
+                <div class="log-item">
+                    <span class="log-time">{{ log.created_at.strftime("%m-%d %H:%M") if log.created_at else "-" }}</span>
+                    <strong>{{ action_label(log.action) }}</strong>
+                    <span class="log-operator">{{ log.operator or "系统" }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
     </main>
 </div>
 </body>

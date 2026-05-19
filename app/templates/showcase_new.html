@@ -35,6 +35,7 @@
         {% if error %}
         <div class="error-text">{{ error }}</div>
         {% endif %}
+        {% include "_flash.html" %}
 
         <div class="card">
             <form action="/showcase/manage/new" method="post" class="form-grid" enctype="multipart/form-data">

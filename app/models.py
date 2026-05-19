@@ -48,6 +48,7 @@ class PrintJob(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     order_id = Column(Integer, index=True, nullable=False)
+    print_template = Column(String, default="delivery")
     status = Column(String, default="pending", index=True)  # pending / printing / done / failed
     client_id = Column(String, default="")
     attempts = Column(Integer, default=0)

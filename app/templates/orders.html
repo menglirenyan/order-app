@@ -36,6 +36,7 @@
                 <a class="btn-primary" href="/orders/new">新建订单</a>
             </div>
         </div>
+        {% include "_flash.html" %}
 
         <div class="card filter-card compact-filter-card">
             <form method="get" action="/orders" class="filter-form" id="order-filter-form">
@@ -88,7 +89,7 @@
                 </div>
 
                 <div class="summary-item">
-                    <div class="summary-label">待结金额（总金额扣定金）</div>
+                    <div class="summary-label">待结金额（总金额扣已收）</div>
                     <div class="summary-value">{{ "%.2f"|format(balance_due_sum) }}</div>
                 </div>
             </div>
@@ -101,6 +102,11 @@
             <div class="bulk-print-bar">
                 <div class="bulk-print-actions">
                     <button class="btn-secondary" type="button" id="select-all-print">全选未打印</button>
+                    <select name="print_template" class="compact-select" aria-label="批量打印模板">
+                        {% for key, item in print_templates.items() %}
+                        <option value="{{ key }}">{{ item.label }}</option>
+                        {% endfor %}
+                    </select>
                     <button class="btn-primary" type="submit" id="batch-print-btn" disabled>批量发送打印</button>
                 </div>
                 <div class="bulk-print-hint" id="batch-print-hint">请选择要发送到 Win7 打印客户端的订单。</div>
@@ -114,7 +120,7 @@
                         <th>商品</th>
                         <th>尺寸</th>
                         <th>总金额</th>
-                        <th>定金</th>
+                        <th>已收</th>
                         <th>待结金额</th>
                         <th>付款状态</th>
                         <th>打印状态</th>
@@ -171,7 +177,7 @@
                             <span>商品：{{ order.item_name }}</span>
                             <span>尺寸：{{ order.size or "无" }}</span>
                             <span>总额：{{ order.total_amount }}</span>
-                            <span>定金：{{ order.paid_amount }}</span>
+                            <span>已收：{{ order.paid_amount }}</span>
                             <span>待结：{{ order.unpaid_amount }}</span>
                             <span>付款：<span class="status-badge status-payment-{{ order.payment_status }}">{{ order.payment_status }}</span></span>
                             <span>打印：<span class="status-badge status-print-{{ order.print_status }}">{{ order.print_status }}</span></span>
@@ -180,6 +186,7 @@
                             {% if order.print_status == "未打印" %}
                             <form action="/orders/{{ order.id }}/print" method="post" onsubmit="return confirm('确认加入打印队列？');">
                                 <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+                                <input type="hidden" name="print_template" value="delivery">
                                 <button class="btn-primary mobile-order-action" type="submit">加入打印队列</button>
                             </form>
                             {% endif %}
