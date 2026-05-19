@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>工作台</title>
     <link rel="stylesheet" href="/static/app.css">
+    <script src="/static/mobile_ui.js" defer></script>
 </head>
 <body>
 <div class="layout">
@@ -34,7 +35,7 @@
 
         {% if pending_orders %}
         <div class="card">
-            <table class="data-table">
+            <table class="data-table dashboard-table">
                 <thead>
                     <tr>
                         <th>订单号</th>
@@ -72,6 +73,44 @@
                 {% endfor %}
                 </tbody>
             </table>
+            <div class="mobile-order-list">
+                {% for order in pending_orders %}
+                <article class="mobile-order-card" data-mobile-toggle-card>
+                    <div class="mobile-order-head">
+                        <strong>{{ order.order_no }}</strong>
+                        <span>点击展开</span>
+                    </div>
+                    <div class="mobile-order-summary">
+                        <div class="mobile-order-main">
+                            <div class="mobile-order-title">{{ order.customer }} - {{ order.item_name }}</div>
+                            <div class="mobile-order-subtitle">截至：{{ order.due_date or "未设置" }}</div>
+                        </div>
+                        <div class="mobile-order-amount">待结 {{ order.unpaid_amount }}</div>
+                    </div>
+                    <div class="mobile-order-statuses">
+                        <span class="priority-badge priority-{{ order.priority_color }}">{{ order.priority_color }}</span>
+                        <span class="status-badge status-payment-{{ order.payment_status }}">{{ order.payment_status }}</span>
+                    </div>
+                    <div class="mobile-order-more">点击查看完整信息</div>
+                    <div class="mobile-order-details">
+                        <div class="mobile-order-meta">
+                            <span>客户：{{ order.customer }}</span>
+                            <span>商品：{{ order.item_name }}</span>
+                            <span>尺寸：{{ order.size or "无" }}</span>
+                            <span>优先级：{{ order.priority_color }}</span>
+                            <span>截至：{{ order.due_date or "未设置" }}</span>
+                            <span>定金：{{ order.paid_amount }}</span>
+                            <span>待结：{{ order.unpaid_amount }}</span>
+                            <span>付款：<span class="status-badge status-payment-{{ order.payment_status }}">{{ order.payment_status }}</span></span>
+                            <span>备注：{{ order.remark or "无" }}</span>
+                        </div>
+                        <div class="mobile-card-actions">
+                            <a class="btn-secondary mobile-order-action" href="/orders/{{ order.id }}">查看</a>
+                        </div>
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
         </div>
         {% else %}
         <div class="empty-box">

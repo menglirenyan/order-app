@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>订单列表</title>
     <link rel="stylesheet" href="/static/app.css">
+    <script src="/static/mobile_ui.js" defer></script>
 </head>
 <body>
 <div class="layout">
@@ -158,30 +159,45 @@
             </table>
             <div class="mobile-order-list">
                 {% for order in orders %}
-                <div class="mobile-order-card">
+                <article class="mobile-order-card" data-mobile-toggle-card>
                     <div class="mobile-order-head">
                         <strong>{{ order.order_no }}</strong>
-                        <span>{{ order.print_status }}</span>
+                        <span>点击展开</span>
                     </div>
-                    <div class="mobile-order-title">{{ order.customer }} - {{ order.item_name }}</div>
-                    <div class="mobile-order-meta">
-                        <span>尺寸：{{ order.size or "无" }}</span>
-                        <span>总额：{{ order.total_amount }}</span>
-                        <span>定金：{{ order.paid_amount }}</span>
-                        <span>待结：{{ order.unpaid_amount }}</span>
-                        <span>付款：<span class="status-badge status-payment-{{ order.payment_status }}">{{ order.payment_status }}</span></span>
-                        <span>打印：<span class="status-badge status-print-{{ order.print_status }}">{{ order.print_status }}</span></span>
+                    <div class="mobile-order-summary">
+                        <div class="mobile-order-main">
+                            <div class="mobile-order-title">{{ order.customer }} - {{ order.item_name }}</div>
+                            <div class="mobile-order-subtitle">尺寸：{{ order.size or "无" }}</div>
+                        </div>
+                        <div class="mobile-order-amount">待结 {{ order.unpaid_amount }}</div>
                     </div>
-                    <div class="mobile-card-actions">
-                        {% if order.print_status == "未打印" %}
-                        <label class="mobile-print-select">
-                            <input class="print-order-checkbox" type="checkbox" name="order_ids" value="{{ order.id }}">
-                            选择打印
-                        </label>
-                        {% endif %}
-                        <a class="btn-secondary mobile-order-action" href="/orders/{{ order.id }}">查看</a>
+                    <div class="mobile-order-statuses">
+                        <span class="status-badge status-payment-{{ order.payment_status }}">{{ order.payment_status }}</span>
+                        <span class="status-badge status-print-{{ order.print_status }}">{{ order.print_status }}</span>
                     </div>
-                </div>
+                    <div class="mobile-order-more">点击查看完整信息</div>
+                    <div class="mobile-order-details">
+                        <div class="mobile-order-meta">
+                            <span>客户：{{ order.customer }}</span>
+                            <span>商品：{{ order.item_name }}</span>
+                            <span>尺寸：{{ order.size or "无" }}</span>
+                            <span>总额：{{ order.total_amount }}</span>
+                            <span>定金：{{ order.paid_amount }}</span>
+                            <span>待结：{{ order.unpaid_amount }}</span>
+                            <span>付款：<span class="status-badge status-payment-{{ order.payment_status }}">{{ order.payment_status }}</span></span>
+                            <span>打印：<span class="status-badge status-print-{{ order.print_status }}">{{ order.print_status }}</span></span>
+                        </div>
+                        <div class="mobile-card-actions">
+                            {% if order.print_status == "未打印" %}
+                            <label class="mobile-print-select">
+                                <input class="print-order-checkbox" type="checkbox" name="order_ids" value="{{ order.id }}">
+                                选择打印
+                            </label>
+                            {% endif %}
+                            <a class="btn-secondary mobile-order-action" href="/orders/{{ order.id }}">查看</a>
+                        </div>
+                    </div>
+                </article>
                 {% endfor %}
             </div>
             </form>

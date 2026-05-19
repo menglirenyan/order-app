@@ -712,11 +712,27 @@ body {
   display: none;
 }
 
+.mobile-menu-button,
+.mobile-nav-overlay,
+.mobile-new-order-fab {
+  display: none;
+}
+
 .mobile-order-card {
   border: 1px solid #e5e7eb;
   border-radius: 14px;
   padding: 14px;
   background: #ffffff;
+  min-width: 0;
+}
+
+.mobile-order-card[data-mobile-toggle-card] {
+  cursor: pointer;
+}
+
+.mobile-order-card:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.35);
+  outline-offset: 2px;
 }
 
 .mobile-order-head {
@@ -734,6 +750,49 @@ body {
 .mobile-order-title {
   margin-top: 10px;
   font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.mobile-order-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.mobile-order-main {
+  min-width: 0;
+}
+
+.mobile-order-subtitle {
+  color: #6b7280;
+  font-size: 13px;
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-order-amount {
+  color: #dc2626;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.mobile-order-statuses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.mobile-order-details {
+  display: none;
+}
+
+.mobile-order-card.is-expanded .mobile-order-details {
+  display: grid;
 }
 
 .mobile-order-meta {
@@ -743,6 +802,21 @@ body {
   margin: 12px 0;
   color: #4b5563;
   font-size: 14px;
+}
+
+.mobile-order-meta span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.mobile-order-more {
+  color: #6b7280;
+  font-size: 12px;
+  margin-top: 10px;
+}
+
+.mobile-order-card.is-expanded .mobile-order-more {
+  display: none;
 }
 
 .mobile-order-action {
@@ -1157,13 +1231,31 @@ body {
 }
 
 @media (max-width: 768px) {
+  html,
+  body,
+  .layout,
+  .content {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
   .layout {
     display: block;
+    width: 100%;
   }
 
   .sidebar {
-    width: 100%;
-    padding: 14px 12px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(76vw, 220px);
+    padding: 64px 12px 18px;
+    transform: translateX(-105%);
+    transition: transform 0.2s ease;
+    z-index: 80;
+    overflow-y: auto;
+    box-shadow: 12px 0 28px rgba(15, 23, 42, 0.24);
   }
 
   .sidebar h2 {
@@ -1176,8 +1268,70 @@ body {
     margin-bottom: 4px;
   }
 
+  .mobile-nav-open .sidebar {
+    transform: translateX(0);
+  }
+
+  .mobile-menu-button {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 90;
+    width: 44px;
+    height: 44px;
+    border: none;
+    border-radius: 12px;
+    background: #111827;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.22);
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    cursor: pointer;
+  }
+
+  .mobile-menu-button span {
+    width: 20px;
+    height: 2px;
+    border-radius: 999px;
+    background: #ffffff;
+  }
+
+  .mobile-nav-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    background: rgba(15, 23, 42, 0.36);
+  }
+
+  .mobile-nav-open .mobile-nav-overlay {
+    display: block;
+  }
+
+  .mobile-new-order-fab {
+    position: fixed;
+    right: 14px;
+    bottom: 16px;
+    z-index: 60;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 76px;
+    height: 44px;
+    padding: 0 14px;
+    border-radius: 999px;
+    background: #2563eb;
+    color: #ffffff;
+    text-decoration: none;
+    font-weight: 700;
+    box-shadow: 0 10px 24px rgba(37, 99, 235, 0.28);
+  }
+
   .content {
-    padding: 14px 14px 76px;
+    width: 100%;
+    min-width: 0;
+    padding: 68px 12px 78px;
   }
 
   .page-header {
@@ -1225,7 +1379,7 @@ body {
 
   .form-actions {
     position: sticky;
-    bottom: 58px;
+    bottom: 0;
     background: rgba(245, 247, 251, 0.96);
     padding: 12px 0 2px;
   }
@@ -1242,35 +1396,17 @@ body {
     display: none;
   }
 
+  .dashboard-table {
+    display: none;
+  }
+
   .mobile-order-list {
     display: grid;
     gap: 12px;
   }
 
   .bottom-nav {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: 58px;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    background: #ffffff;
-    border-top: 1px solid #e5e7eb;
-    z-index: 50;
-  }
-
-  .bottom-nav a {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #6b7280;
-    text-decoration: none;
-    font-weight: 600;
-  }
-
-  .bottom-nav a.active {
-    color: #2563eb;
+    display: none;
   }
 
   .draft-fields,
