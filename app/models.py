@@ -58,6 +58,25 @@ class PrintJob(Base):
     printed_at = Column(DateTime, nullable=True)
 
 
+class AppSetting(Base):
+    __tablename__ = "app_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String, unique=True, index=True, nullable=False)
+    value = Column(Text, default="")
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class PrintTemplateRule(Base):
+    __tablename__ = "print_template_rules"
+
+    id = Column(Integer, primary_key=True, index=True)
+    customer_name = Column(String, unique=True, index=True, nullable=False)
+    print_template = Column(String, default="delivery")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+
 class ShowcaseItem(Base):
     __tablename__ = "showcase_items"
 

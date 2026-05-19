@@ -103,6 +103,7 @@
                 <div class="bulk-print-actions">
                     <button class="btn-secondary" type="button" id="select-all-print">全选未打印</button>
                     <select name="print_template" class="compact-select" aria-label="批量打印模板">
+                        <option value="auto" selected>按设置自动选择</option>
                         {% for key, item in print_templates.items() %}
                         <option value="{{ key }}">{{ item.label }}</option>
                         {% endfor %}
@@ -186,7 +187,7 @@
                             {% if order.print_status == "未打印" %}
                             <form action="/orders/{{ order.id }}/print" method="post" onsubmit="return confirm('确认加入打印队列？');">
                                 <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
-                                <input type="hidden" name="print_template" value="delivery">
+                                <input type="hidden" name="print_template" value="auto">
                                 <button class="btn-primary mobile-order-action" type="submit">加入打印队列</button>
                             </form>
                             {% endif %}

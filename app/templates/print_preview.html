@@ -44,8 +44,9 @@
         <div class="card print-template-switcher">
             <form method="get" action="/orders/{{ order.id }}/print-preview" class="inline-picker-form">
                 <select name="print_template">
+                    <option value="auto" {% if requested_template == "auto" %}selected{% endif %}>按设置自动选择 · 当前为 {{ template_label }}</option>
                     {% for key, item in print_templates.items() %}
-                    <option value="{{ key }}" {% if template_key == key %}selected{% endif %}>{{ item.label }} · {{ item.description }}</option>
+                    <option value="{{ key }}" {% if requested_template == key %}selected{% endif %}>{{ item.label }} · {{ item.description }}</option>
                     {% endfor %}
                 </select>
                 <button class="btn-secondary" type="submit">切换预览</button>

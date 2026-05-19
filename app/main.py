@@ -21,7 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 
 from .db import SessionLocal, engine, Base
-from .models import Order, User, ShowcaseItem, OperationLog, PrintJob
+from .models import AppSetting, Order, User, ShowcaseItem, OperationLog, PrintJob, PrintTemplateRule
 
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key")
 
@@ -377,11 +377,56 @@ def normalize_print_template(template_key: str) -> str:
     return template_key if template_key in PRINT_TEMPLATES else "delivery"
 
 
+def is_auto_print_template(template_key: str) -> bool:
+    return str(template_key or "").strip() in ("", "auto")
+
+
 def print_template_label(template_key: str) -> str:
     return PRINT_TEMPLATES[normalize_print_template(template_key)]["label"]
 
 
 templates.env.globals["print_template_label"] = print_template_label
+
+
+def get_app_setting(db: Session, key: str, default: str = "") -> str:
+    setting = db.query(AppSetting).filter(AppSetting.key == key).first()
+    if setting is None:
+        return default
+    return str(setting.value or default)
+
+
+def set_app_setting(db: Session, key: str, value: str):
+    setting = db.query(AppSetting).filter(AppSetting.key == key).first()
+    if setting is None:
+        setting = AppSetting(key=key, value=value, updated_at=datetime.utcnow())
+        db.add(setting)
+    else:
+        setting.value = value
+        setting.updated_at = datetime.utcnow()
+    return setting
+
+
+def get_default_print_template(db: Session) -> str:
+    return normalize_print_template(get_app_setting(db, "default_print_template", "delivery"))
+
+
+def get_customer_print_template(db: Session, customer_name: str):
+    customer_name = str(customer_name or "").strip()
+    if not customer_name:
+        return None
+    rule = db.query(PrintTemplateRule).filter(PrintTemplateRule.customer_name == customer_name).first()
+    if rule is None:
+        return None
+    return normalize_print_template(rule.print_template)
+
+
+def resolve_print_template(db: Session, order: Order, requested_template: str = "auto") -> str:
+    if not is_auto_print_template(requested_template):
+        return normalize_print_template(requested_template)
+    customer_template = get_customer_print_template(db, order.customer)
+    if customer_template:
+        return customer_template
+    return get_default_print_template(db)
 
 
 def build_print_text(order: Order, template_key: str = "delivery") -> str:
@@ -550,11 +595,10 @@ def queue_print_jobs(
     db: Session,
     orders: list[Order],
     operator: str = "",
-    print_template: str = "delivery",
+    print_template: str = "auto",
 ):
     queued = []
     skipped = []
-    print_template = normalize_print_template(print_template)
 
     for order in orders:
         if order.print_status == "已打印":
@@ -565,7 +609,8 @@ def queue_print_jobs(
             skipped.append(order)
             continue
 
-        job = PrintJob(order_id=order.id, print_template=print_template, status="pending")
+        resolved_template = resolve_print_template(db, order, print_template)
+        job = PrintJob(order_id=order.id, print_template=resolved_template, status="pending")
         db.add(job)
         db.flush()
 
@@ -576,7 +621,7 @@ def queue_print_jobs(
             action="queue_print",
             field_name="print_job",
             old_value="",
-            new_value=f"job_id={job.id};template={print_template}",
+            new_value=f"job_id={job.id};template={resolved_template}",
             operator=operator
         )
         queued.append(order)
@@ -2042,7 +2087,7 @@ def order_detail(request: Request, order_id: int):
 
 
 @app.get("/orders/{order_id}/print-preview")
-def print_preview_page(request: Request, order_id: int, print_template: str = "delivery"):
+def print_preview_page(request: Request, order_id: int, print_template: str = "auto"):
     db: Session = SessionLocal()
     try:
         redirect = require_login(request)
@@ -2059,7 +2104,7 @@ def print_preview_page(request: Request, order_id: int, print_template: str = "d
                 status_code=404
             )
 
-        template_key = normalize_print_template(print_template)
+        template_key = resolve_print_template(db, order, print_template)
         return templates.TemplateResponse(
             request=request,
             name="print_preview.html",
@@ -2067,6 +2112,7 @@ def print_preview_page(request: Request, order_id: int, print_template: str = "d
                 "order": order,
                 "current_user": current_user,
                 "template_key": template_key,
+                "requested_template": str(print_template or "auto"),
                 "template_label": PRINT_TEMPLATES[template_key]["label"],
                 "preview_text": build_print_text(order, template_key),
             }
@@ -2228,7 +2274,7 @@ def edit_order_submit(
 def mark_order_printed(
     request: Request,
     order_id: int,
-    print_template: str = Form("delivery"),
+    print_template: str = Form("auto"),
     return_to: str = Form("")
 ):
     db: Session = SessionLocal()
@@ -2265,7 +2311,7 @@ def mark_order_printed(
 def batch_print_orders(
     request: Request,
     order_ids: list[int] = Form(default=[]),
-    print_template: str = Form("delivery"),
+    print_template: str = Form("auto"),
     return_to: str = Form("/orders")
 ):
     db: Session = SessionLocal()
@@ -2427,6 +2473,119 @@ async def print_client_report(request: Request):
         db.close()
 
 
+@app.get("/print-settings")
+def print_settings_page(request: Request):
+    db: Session = SessionLocal()
+    try:
+        redirect = require_admin(request, db)
+        if redirect:
+            return redirect
+
+        current_user = get_current_user(request, db)
+        customers = (
+            db.query(Order.customer)
+            .filter(Order.customer != "")
+            .distinct()
+            .order_by(Order.customer.asc())
+            .limit(300)
+            .all()
+        )
+        rules = (
+            db.query(PrintTemplateRule)
+            .order_by(PrintTemplateRule.customer_name.asc())
+            .all()
+        )
+        return templates.TemplateResponse(
+            request=request,
+            name="print_settings.html",
+            context={
+                "current_user": current_user,
+                "default_print_template": get_default_print_template(db),
+                "rules": rules,
+                "customers": [row[0] for row in customers if row[0]],
+            }
+        )
+    finally:
+        db.close()
+
+
+@app.post("/print-settings/default")
+def update_default_print_template(
+    request: Request,
+    default_print_template: str = Form("delivery")
+):
+    db: Session = SessionLocal()
+    try:
+        redirect = require_admin(request, db)
+        if redirect:
+            return redirect
+
+        template_key = normalize_print_template(default_print_template)
+        set_app_setting(db, "default_print_template", template_key)
+        db.commit()
+        add_flash(request, f"默认打印模板已设置为：{print_template_label(template_key)}", "success")
+        return RedirectResponse(url="/print-settings", status_code=303)
+    finally:
+        db.close()
+
+
+@app.post("/print-settings/rules")
+def save_print_template_rule(
+    request: Request,
+    customer_name: str = Form(...),
+    print_template: str = Form("delivery")
+):
+    db: Session = SessionLocal()
+    try:
+        redirect = require_admin(request, db)
+        if redirect:
+            return redirect
+
+        customer_name = str(customer_name or "").strip()
+        if not customer_name:
+            add_flash(request, "客户名称不能为空", "error")
+            return RedirectResponse(url="/print-settings", status_code=303)
+
+        template_key = normalize_print_template(print_template)
+        rule = db.query(PrintTemplateRule).filter(PrintTemplateRule.customer_name == customer_name).first()
+        if rule is None:
+            rule = PrintTemplateRule(
+                customer_name=customer_name,
+                print_template=template_key,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+            db.add(rule)
+        else:
+            rule.print_template = template_key
+            rule.updated_at = datetime.utcnow()
+        db.commit()
+        add_flash(request, f"{customer_name} 的打印模板已设置为：{print_template_label(template_key)}", "success")
+        return RedirectResponse(url="/print-settings", status_code=303)
+    finally:
+        db.close()
+
+
+@app.post("/print-settings/rules/{rule_id}/delete")
+def delete_print_template_rule(request: Request, rule_id: int):
+    db: Session = SessionLocal()
+    try:
+        redirect = require_admin(request, db)
+        if redirect:
+            return redirect
+
+        rule = db.query(PrintTemplateRule).filter(PrintTemplateRule.id == rule_id).first()
+        if rule is not None:
+            db.delete(rule)
+            db.commit()
+            add_flash(request, f"已删除 {rule.customer_name} 的专属模板规则", "success")
+        else:
+            add_flash(request, "规则不存在", "warning")
+        return RedirectResponse(url="/print-settings", status_code=303)
+    finally:
+        db.close()
+
+
 @app.get("/print-jobs")
 @app.get("/print_jobs")
 @app.get("/print-queue")
@@ -2487,6 +2646,7 @@ def print_jobs_page(request: Request, status: str = ""):
                 "status_counts": status_counts,
                 "available_orders": available_orders,
                 "current_user": current_user,
+                "default_print_template": get_default_print_template(db),
                 "status_labels": {
                     "pending": "等待打印",
                     "printing": "打印中",
@@ -2503,7 +2663,7 @@ def print_jobs_page(request: Request, status: str = ""):
 def add_order_to_print_queue(
     request: Request,
     order_id: int = Form(...),
-    print_template: str = Form("delivery")
+    print_template: str = Form("auto")
 ):
     db: Session = SessionLocal()
     try:

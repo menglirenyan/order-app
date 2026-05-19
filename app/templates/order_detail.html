@@ -57,6 +57,7 @@
     {% if order.print_status == "未打印" %}
     <form action="/orders/{{ order.id }}/print" method="post" onsubmit="return confirm('确认发送到打印队列？Win7 客户端打印成功后才会标记为已打印。');">
         <select name="print_template" class="compact-select" aria-label="打印模板">
+            <option value="auto" selected>按设置自动选择</option>
             {% for key, item in print_templates.items() %}
             <option value="{{ key }}">{{ item.label }}</option>
             {% endfor %}
