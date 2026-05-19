@@ -971,14 +971,36 @@ def normalize_quote_rows(rows):
         name = str(row.get("name") or row.get("title") or "").strip()
         if not name:
             continue
+        quantity = str(row.get("quantity") or "1").strip()[:20]
+        unit_price = str(row.get("price") or row.get("unit_price") or "").strip()[:30]
+        quantity_value = parse_quote_number(quantity, default=1.0)
+        price_value = parse_quote_number(unit_price, default=0.0)
+        amount_value = quantity_value * price_value
         normalized.append({
             "name": name[:80],
             "image_url": str(row.get("image_url") or "").strip()[:500],
             "size": str(row.get("size") or "").strip()[:80],
-            "quantity": str(row.get("quantity") or "").strip()[:20],
-            "price": str(row.get("price") or "").strip()[:30],
+            "quantity": quantity,
+            "price": unit_price,
+            "amount": format_quote_money(amount_value),
+            "amount_value": amount_value,
         })
     return normalized
+
+
+def parse_quote_number(value, default: float = 0.0) -> float:
+    text_value = str(value or "").replace(",", "").strip()
+    match = re.search(r"-?\d+(?:\.\d+)?", text_value)
+    if not match:
+        return default
+    try:
+        return float(match.group(0))
+    except ValueError:
+        return default
+
+
+def format_quote_money(value: float) -> str:
+    return f"{value:.2f}"
 
 
 def resolve_static_image_path(image_url: str):
@@ -1003,15 +1025,6 @@ def read_quote_image_bytes(image_url: str):
     local_path = resolve_static_image_path(image_url)
     if local_path:
         return local_path.read_bytes()
-
-    if image_url.startswith(("http://", "https://")):
-        try:
-            with urlrequest.urlopen(image_url, timeout=5) as response:
-                data = response.read(QUOTE_IMAGE_MAX_BYTES + 1)
-                if len(data) <= QUOTE_IMAGE_MAX_BYTES:
-                    return data
-        except (HTTPError, URLError, TimeoutError, ValueError):
-            return None
     return None
 
 
@@ -1072,11 +1085,11 @@ def build_quote_image(rows):
 
     margin = 40
     table_width = 1120
-    col_widths = [190, 320, 290, 120, 200]
+    col_widths = [150, 320, 160, 90, 150, 250]
     title_height = 76
     header_height = 48
     row_height = 210
-    footer_height = 42
+    footer_height = 70
     width = table_width + margin * 2
     height = margin + title_height + header_height + row_height * len(rows) + footer_height + margin
 
@@ -1086,7 +1099,7 @@ def build_quote_image(rows):
     draw.text((margin + 20, margin + 18), "报价单", font=title_font, fill="#111827")
     draw.text((margin + table_width - 230, margin + 31), datetime.now().strftime("%Y-%m-%d %H:%M"), font=small_font, fill="#6b7280")
 
-    headers = ["名称", "图片", "尺寸", "数量", "价格"]
+    headers = ["名称", "图片", "尺寸", "数量", "单价", "金额"]
     y = margin + title_height
     x = margin
     for index, header in enumerate(headers):
@@ -1118,14 +1131,20 @@ def build_quote_image(rows):
             draw.text((empty_x0 + 76, empty_y0 + 72), "无图", font=small_font, fill="#6b7280")
 
         size_x = margin + col_widths[0] + col_widths[1]
-        draw_wrapped_text(draw, row["size"], (size_x + 12, y + 18), body_font, "#374151", col_widths[2] - 24, 24, max_lines=6)
+        draw_wrapped_text(draw, row["size"], (size_x + 12, y + 18), body_font, "#374151", col_widths[2] - 24, 24, max_lines=4)
         qty_x = size_x + col_widths[2]
         draw_wrapped_text(draw, row["quantity"], (qty_x + 12, y + 18), body_font, "#374151", col_widths[3] - 24, 24, max_lines=2)
-        price_x = qty_x + col_widths[3]
-        draw_wrapped_text(draw, row["price"], (price_x + 12, y + 18), body_font, "#374151", col_widths[4] - 24, 24, max_lines=3)
+        unit_price_x = qty_x + col_widths[3]
+        draw_wrapped_text(draw, row["price"], (unit_price_x + 12, y + 18), body_font, "#374151", col_widths[4] - 24, 24, max_lines=3)
+        amount_x = unit_price_x + col_widths[4]
+        draw_wrapped_text(draw, row["amount"], (amount_x + 12, y + 18), body_font, "#111827", col_widths[5] - 24, 24, max_lines=2)
         y += row_height
 
+    total_value = sum(row.get("amount_value") or 0 for row in rows)
     draw.text((margin + 20, y + 18), "此报价单由当前页面临时生成，系统内不保存。", font=small_font, fill="#6b7280")
+    total_text = f"总计：{format_quote_money(total_value)}"
+    total_width = text_width(draw, total_text, title_font)
+    draw.text((margin + table_width - total_width - 20, y + 14), total_text, font=title_font, fill="#dc2626")
     output = BytesIO()
     image.save(output, format="PNG")
     output.seek(0)
@@ -1143,12 +1162,13 @@ def build_quote_excel(rows):
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "报价单"
-    sheet.append(["货物名称", "图片", "尺寸", "数量", "价格"])
+    sheet.append(["货物名称", "图片", "尺寸", "数量", "单价", "金额"])
     sheet.column_dimensions["A"].width = 28
     sheet.column_dimensions["B"].width = 18
     sheet.column_dimensions["C"].width = 28
     sheet.column_dimensions["D"].width = 12
     sheet.column_dimensions["E"].width = 16
+    sheet.column_dimensions["F"].width = 16
 
     header_fill = PatternFill("solid", fgColor="EEF2FF")
     thin = Side(style="thin", color="D1D5DB")
@@ -1166,9 +1186,10 @@ def build_quote_excel(rows):
         sheet.cell(index, 3, row["size"])
         sheet.cell(index, 4, row["quantity"])
         sheet.cell(index, 5, row["price"])
+        sheet.cell(index, 6, row["amount"])
         sheet.row_dimensions[index].height = 86
 
-        for column in range(1, 6):
+        for column in range(1, 7):
             cell = sheet.cell(index, column)
             cell.border = border
             cell.alignment = Alignment(vertical="center", wrap_text=True)
@@ -1183,6 +1204,14 @@ def build_quote_excel(rows):
             excel_image.height = 88
             sheet.add_image(excel_image, f"B{index}")
             image_refs.append(buffer)
+
+    total_row = len(rows) + 2
+    sheet.cell(total_row, 5, "总计")
+    sheet.cell(total_row, 6, format_quote_money(sum(row.get("amount_value") or 0 for row in rows)))
+    for column in range(1, 7):
+        cell = sheet.cell(total_row, column)
+        cell.border = border
+        cell.font = Font(bold=True, color="111827")
 
     workbook._quote_image_refs = image_refs
     output = BytesIO()
@@ -2392,12 +2421,14 @@ def undo_last_order_action(request: Request, order_id: int):
 # ========================
 
 @app.get("/showcase")
-def showcase_public(request: Request, category: str = ""):
+def showcase_public(request: Request, category: str = "", q: str = ""):
     db: Session = SessionLocal()
     try:
         query = db.query(ShowcaseItem).filter(ShowcaseItem.is_visible == True)
         if category.strip():
             query = query.filter(ShowcaseItem.category == category.strip())
+        if q.strip():
+            query = query.filter(ShowcaseItem.title.like(f"%{q.strip()}%"))
 
         items = query.order_by(ShowcaseItem.category.asc(), ShowcaseItem.item_code.asc(), ShowcaseItem.id.asc()).all()
         categories = (
@@ -2414,7 +2445,8 @@ def showcase_public(request: Request, category: str = ""):
             context={
                 "items": items,
                 "categories": [row[0] for row in categories if row[0]],
-                "current_category": category
+                "current_category": category,
+                "current_query": q.strip()
             }
         )
     finally:
@@ -2566,7 +2598,6 @@ async def showcase_quotation_image(request: Request):
     redirect = require_login(request)
     if redirect:
         return JSONResponse({"error": "请先登录"}, status_code=401)
-
     payload = await request.json()
     rows = normalize_quote_rows(payload.get("rows") if isinstance(payload, dict) else payload)
     if not rows:
@@ -2590,7 +2621,6 @@ async def showcase_quotation_excel(request: Request):
     redirect = require_login(request)
     if redirect:
         return JSONResponse({"error": "请先登录"}, status_code=401)
-
     payload = await request.json()
     rows = normalize_quote_rows(payload.get("rows") if isinstance(payload, dict) else payload)
     if not rows:

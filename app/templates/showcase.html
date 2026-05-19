@@ -11,15 +11,26 @@
     <div class="public-header shop-header">
         <div>
             <h1>货物展示</h1>
-            <p>{{ items|length }} 个货物{% if current_category %} · {{ current_category }}{% endif %}</p>
+            <p>{{ items|length }} 个货物{% if current_category %} · {{ current_category }}{% endif %}{% if current_query %} · 搜索：{{ current_query }}{% endif %}</p>
         </div>
     </div>
 
+    <form class="showcase-search" method="get" action="/showcase">
+        {% if current_category %}
+        <input type="hidden" name="category" value="{{ current_category }}">
+        {% endif %}
+        <input type="search" name="q" value="{{ current_query }}" placeholder="按标题搜索货物">
+        <button class="btn-primary" type="submit">搜索</button>
+        {% if current_query %}
+        <a class="btn-secondary" href="/showcase{% if current_category %}?category={{ current_category|urlencode }}{% endif %}">清空</a>
+        {% endif %}
+    </form>
+
     {% if categories %}
     <div class="category-tabs">
-        <a class="category-tab {% if not current_category %}active{% endif %}" href="/showcase">全部</a>
+        <a class="category-tab {% if not current_category %}active{% endif %}" href="/showcase{% if current_query %}?q={{ current_query|urlencode }}{% endif %}">全部</a>
         {% for category in categories %}
-        <a class="category-tab {% if current_category == category %}active{% endif %}" href="/showcase?category={{ category|urlencode }}">{{ category }}</a>
+        <a class="category-tab {% if current_category == category %}active{% endif %}" href="/showcase?category={{ category|urlencode }}{% if current_query %}&q={{ current_query|urlencode }}{% endif %}">{{ category }}</a>
         {% endfor %}
     </div>
     {% endif %}

@@ -51,7 +51,16 @@
         {% if items %}
         <div class="showcase-grid shop-grid manage-selection-grid" id="manageGrid">
             {% for item in items %}
-            <article class="showcase-card shop-card manage-select-card" data-item-id="{{ item.id }}" data-title="{{ item.title }}" data-image-url="{{ item.image_url or '' }}">
+            <article
+                class="showcase-card shop-card manage-select-card"
+                data-item-id="{{ item.id }}"
+                data-title="{{ item.title }}"
+                data-image-url="{{ item.image_url or '' }}"
+                data-category="{{ item.category or '未分类' }}"
+                data-code="{{ item.item_code or ('#' ~ item.id) }}"
+                data-visible="{% if item.is_visible %}显示{% else %}隐藏{% endif %}"
+                data-description="{{ item.description or '' }}"
+            >
                 <div class="selection-mark" aria-hidden="true"></div>
                 {% if item.image_url %}
                 <div class="showcase-image-frame">
@@ -60,16 +69,8 @@
                 {% else %}
                 <div class="showcase-image-frame showcase-image-empty">暂无图片</div>
                 {% endif %}
-                <div class="showcase-card-body">
-                    <div class="manage-product-meta">
-                        <span class="showcase-category">{{ item.category or "未分类" }}</span>
-                        <span class="showcase-code">{{ item.item_code or ("#" ~ item.id) }}</span>
-                    </div>
+                <div class="showcase-card-body manage-card-title-only">
                     <h3>{{ item.title }}</h3>
-                    <div class="muted-text">{% if item.is_visible %}显示{% else %}隐藏{% endif %}</div>
-                    {% if item.description %}
-                    <p>{{ item.description }}</p>
-                    {% endif %}
                 </div>
             </article>
             {% endfor %}
@@ -78,6 +79,29 @@
         <div class="empty-box">还没有展示项。</div>
         {% endif %}
     </main>
+</div>
+
+<div class="quote-modal" id="showcaseDetailModal" hidden>
+    <div class="quote-modal-backdrop" data-close-detail-modal></div>
+    <div class="quote-modal-panel showcase-detail-panel" role="dialog" aria-modal="true" aria-labelledby="showcaseDetailTitle">
+        <div class="quote-modal-head">
+            <div>
+                <h2 id="showcaseDetailTitle">货物详情</h2>
+                <p id="showcaseDetailSummary"></p>
+            </div>
+            <button class="btn-secondary" type="button" data-close-detail-modal>关闭</button>
+        </div>
+        <div class="showcase-detail-body">
+            <img class="showcase-detail-image" id="showcaseDetailImage" alt="">
+            <div class="showcase-detail-empty" id="showcaseDetailEmpty">暂无图片</div>
+            <div class="showcase-detail-meta">
+                <span id="showcaseDetailCategory"></span>
+                <span id="showcaseDetailCode"></span>
+                <span id="showcaseDetailVisible"></span>
+            </div>
+            <p id="showcaseDetailDescription"></p>
+        </div>
+    </div>
 </div>
 
 <div class="quote-modal" id="quoteModal" hidden>
@@ -120,6 +144,15 @@ const quoteModal = document.getElementById("quoteModal");
 const quoteBody = document.getElementById("quoteBody");
 const quoteCount = document.getElementById("quoteCount");
 const quoteStatus = document.getElementById("quoteStatus");
+const showcaseDetailModal = document.getElementById("showcaseDetailModal");
+const showcaseDetailTitle = document.getElementById("showcaseDetailTitle");
+const showcaseDetailSummary = document.getElementById("showcaseDetailSummary");
+const showcaseDetailImage = document.getElementById("showcaseDetailImage");
+const showcaseDetailEmpty = document.getElementById("showcaseDetailEmpty");
+const showcaseDetailCategory = document.getElementById("showcaseDetailCategory");
+const showcaseDetailCode = document.getElementById("showcaseDetailCode");
+const showcaseDetailVisible = document.getElementById("showcaseDetailVisible");
+const showcaseDetailDescription = document.getElementById("showcaseDetailDescription");
 const selectionActions = Array.from(document.querySelectorAll(".selection-action"));
 const newItemBtn = document.getElementById("newItemBtn");
 let selectionMode = false;
@@ -165,6 +198,27 @@ function toggleCard(card, forceSelected = null) {
         card.classList.remove("selected");
     }
     updateSelectionButtons();
+}
+
+function openShowcaseDetail(card) {
+    const imageUrl = card.dataset.imageUrl || "";
+    showcaseDetailTitle.textContent = card.dataset.title || "货物详情";
+    showcaseDetailSummary.textContent = card.dataset.description ? "图片与描述" : "";
+    showcaseDetailCategory.textContent = card.dataset.category || "未分类";
+    showcaseDetailCode.textContent = card.dataset.code || "";
+    showcaseDetailVisible.textContent = card.dataset.visible || "";
+    showcaseDetailDescription.textContent = card.dataset.description || "暂无描述";
+    if (imageUrl) {
+        showcaseDetailImage.hidden = false;
+        showcaseDetailImage.src = imageUrl;
+        showcaseDetailImage.alt = card.dataset.title || "";
+        showcaseDetailEmpty.hidden = true;
+    } else {
+        showcaseDetailImage.hidden = true;
+        showcaseDetailImage.removeAttribute("src");
+        showcaseDetailEmpty.hidden = false;
+    }
+    showcaseDetailModal.hidden = false;
 }
 
 function renderQuoteRows() {
@@ -305,7 +359,9 @@ if (grid) {
             }
             if (selectionMode) {
                 toggleCard(card);
+                return;
             }
+            openShowcaseDetail(card);
         });
     });
 }
@@ -339,6 +395,9 @@ document.getElementById("downloadImageBtn").addEventListener("click", () => down
 document.getElementById("downloadExcelBtn").addEventListener("click", () => downloadQuote("excel"));
 document.querySelectorAll("[data-close-modal]").forEach(item => {
     item.addEventListener("click", () => quoteModal.hidden = true);
+});
+document.querySelectorAll("[data-close-detail-modal]").forEach(item => {
+    item.addEventListener("click", () => showcaseDetailModal.hidden = true);
 });
 </script>
 </body>
