@@ -1,11 +1,9 @@
 import json
 import os
 import re
-import secrets
-import unicodedata
 import uuid
 from io import BytesIO
-from datetime import datetime, date, timedelta
+from datetime import datetime, date
 from pathlib import Path
 from urllib import request as urlrequest
 from urllib.error import HTTPError, URLError
@@ -21,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 
 from .db import SessionLocal, engine, Base
-from .models import AppSetting, Order, User, ShowcaseItem, OperationLog, PrintJob, PrintTemplateRule
+from .models import AppSetting, Order, User, ShowcaseItem, OperationLog
 
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key")
 
@@ -91,12 +89,6 @@ def ensure_schema():
                     "WHEN total_amount - paid_amount > 0 THEN total_amount - paid_amount "
                     "ELSE 0 END"
                 ))
-    if "print_jobs" in inspector.get_table_names():
-        columns = {column["name"] for column in inspector.get_columns("print_jobs")}
-        if "print_template" not in columns:
-            with engine.begin() as conn:
-                conn.execute(text("ALTER TABLE print_jobs ADD COLUMN print_template VARCHAR DEFAULT 'delivery'"))
-
 
 ensure_schema()
 
@@ -259,14 +251,14 @@ def parse_payment_snapshot(value: str):
 
 def action_label(action: str):
     labels = {
-        "queue_print": "加入打印队列",
-        "mark_printed": "打印成功",
-        "print_failed": "打印失败",
-        "retry_print": "重新打印",
+        "mark_printed": "打印出货单",
+        "mark_production": "标记已投产",
+        "mark_complete": "标记已完成",
         "mark_paid": "标记结清",
         "mark_unpaid": "改回未付款",
         "undo_payment_status": "撤回付款状态",
         "undo_print_status": "撤回打印状态",
+        "undo_production_status": "撤回生产状态",
         "edit_order": "编辑订单",
         "delete_order": "删除订单",
     }
@@ -276,116 +268,27 @@ def action_label(action: str):
 templates.env.globals["action_label"] = action_label
 
 
-def display_width(value: str) -> int:
-    width = 0
-    for char in str(value):
-        width += 2 if unicodedata.east_asian_width(char) in ("W", "F") else 1
-    return width
-
-
-def fit_display(value, width: int, align: str = "left") -> str:
-    text_value = str(value or "")
-    result = ""
-    used = 0
-    for char in text_value:
-        char_width = 2 if unicodedata.east_asian_width(char) in ("W", "F") else 1
-        if used + char_width > width:
-            break
-        result += char
-        used += char_width
-
-    padding = " " * max(width - used, 0)
-    if align == "right":
-        return padding + result
-    if align == "center":
-        left = len(padding) // 2
-        return padding[:left] + result + padding[left:]
-    return result + padding
-
-
-def wrap_display(value, width: int) -> list[str]:
-    lines = []
-    current = ""
-    used = 0
-    for char in str(value or ""):
-        char_width = 2 if unicodedata.east_asian_width(char) in ("W", "F") else 1
-        if current and used + char_width > width:
-            lines.append(current)
-            current = char
-            used = char_width
-        else:
-            current += char
-            used += char_width
-    if current:
-        lines.append(current)
-    return lines or [""]
-
-
 def format_money(value) -> str:
     return f"{float(value or 0):.2f}"
 
 
-def build_delivery_row(name="", spec="", unit="", quantity="", unit_price="", amount="", remark="") -> str:
-    return (
-        "|"
-        + fit_display(name, 18)
-        + "|"
-        + fit_display(spec, 12)
-        + "|"
-        + fit_display(unit, 6, "center")
-        + "|"
-        + fit_display(quantity, 6, "right")
-        + "|"
-        + fit_display(unit_price, 8, "right")
-        + "|"
-        + fit_display(amount, 10, "right")
-        + "|"
-        + fit_display(remark, 16)
-        + "|"
-    )
+templates.env.globals["format_money"] = format_money
 
 
-PRINT_TEMPLATES = {
-    "delivery": {
-        "label": "标准出货单",
-        "description": "当前默认模板，适合普通连续纸或 A5/A4 打印。",
-    },
-    "a4": {
-        "label": "A4 出货单",
-        "description": "内容更舒展，适合 A4 纸。",
-    },
-    "duplicate": {
-        "label": "二联单",
-        "description": "同一订单打印客户联和存根联。",
-    },
-    "triplicate": {
-        "label": "三联单",
-        "description": "同一订单打印客户联、财务联和存根联。",
-    },
-    "receipt": {
-        "label": "小票",
-        "description": "窄纸简版，只保留核心金额和签收信息。",
-    },
-}
-
-
-templates.env.globals["print_templates"] = PRINT_TEMPLATES
-
-
-def normalize_print_template(template_key: str) -> str:
-    template_key = str(template_key or "").strip()
-    return template_key if template_key in PRINT_TEMPLATES else "delivery"
-
-
-def is_auto_print_template(template_key: str) -> bool:
-    return str(template_key or "").strip() in ("", "auto")
-
-
-def print_template_label(template_key: str) -> str:
-    return PRINT_TEMPLATES[normalize_print_template(template_key)]["label"]
-
-
-templates.env.globals["print_template_label"] = print_template_label
+def build_delivery_print_order_data(order: Order) -> dict:
+    return {
+        "id": order.id,
+        "order_no": order.order_no,
+        "created_date": order.created_at.strftime("%Y-%m-%d") if order.created_at else "",
+        "customer": order.customer or "",
+        "phone": order.phone or "",
+        "item_name": order.item_name or "",
+        "size": order.size or "",
+        "quantity": order.quantity or "",
+        "unit_price": float(order.unit_price or 0),
+        "total_amount": float(order.total_amount or 0),
+        "remark": order.remark or "",
+    }
 
 
 def get_app_setting(db: Session, key: str, default: str = "") -> str:
@@ -406,227 +309,85 @@ def set_app_setting(db: Session, key: str, value: str):
     return setting
 
 
-def get_default_print_template(db: Session) -> str:
-    return normalize_print_template(get_app_setting(db, "default_print_template", "delivery"))
-
-
-def get_customer_print_template(db: Session, customer_name: str):
-    customer_name = str(customer_name or "").strip()
-    if not customer_name:
-        return None
-    rule = db.query(PrintTemplateRule).filter(PrintTemplateRule.customer_name == customer_name).first()
-    if rule is None:
-        return None
-    return normalize_print_template(rule.print_template)
-
-
-def resolve_print_template(db: Session, order: Order, requested_template: str = "auto") -> str:
-    if not is_auto_print_template(requested_template):
-        return normalize_print_template(requested_template)
-    customer_template = get_customer_print_template(db, order.customer)
-    if customer_template:
-        return customer_template
-    return get_default_print_template(db)
-
-
-def build_print_text(order: Order, template_key: str = "delivery") -> str:
-    template_key = normalize_print_template(template_key)
-    if template_key == "a4":
-        return build_a4_print_text(order)
-    if template_key == "duplicate":
-        return build_multi_copy_print_text(order, ["客户联", "存根联"])
-    if template_key == "triplicate":
-        return build_multi_copy_print_text(order, ["客户联", "财务联", "存根联"])
-    if template_key == "receipt":
-        return build_receipt_print_text(order)
-    return build_delivery_print_text(order)
-
-
-def build_delivery_print_text(order: Order, copy_label: str = "") -> str:
-    table_width = 86
-    line = "+" + "-" * 18 + "+" + "-" * 12 + "+" + "-" * 6 + "+" + "-" * 6 + "+" + "-" * 8 + "+" + "-" * 10 + "+" + "-" * 16 + "+"
-    customer = f"客户名称：{order.customer or ''}"
-    item_lines = wrap_display(order.item_name or "", 18)
-    spec_lines = wrap_display(order.size or "", 12)
-    remark_lines = wrap_display(order.remark or "", 16)
-    row_count = max(len(item_lines), len(spec_lines), len(remark_lines), 1)
-
-    lines = [
-        fit_display(f"方圆五金出货单{('（' + copy_label + '）') if copy_label else ''}", table_width, "center"),
-        fit_display(f"订单号：{order.order_no}", table_width, "right"),
-        "",
-        customer,
-        line,
-        build_delivery_row("货物名称", "规格", "单位", "数量", "单价", "货款", "备注"),
-        line,
-    ]
-
-    for index in range(row_count):
-        lines.append(build_delivery_row(
-            item_lines[index] if index < len(item_lines) else "",
-            spec_lines[index] if index < len(spec_lines) else "",
-            "件" if index == 0 else "",
-            order.quantity if index == 0 else "",
-            format_money(order.unit_price) if index == 0 else "",
-            format_money(order.total_amount) if index == 0 else "",
-            remark_lines[index] if index < len(remark_lines) else "",
-        ))
-
-    for _ in range(max(5 - row_count, 0)):
-        lines.append(build_delivery_row())
-
-    lines.extend([
-        line,
-        build_delivery_row("合计", "", "", order.quantity, "", format_money(order.total_amount), ""),
-        line,
-        "",
-    ])
-
-    footer_text = (
-        "本厂大型激光切割，剪板，折叠对外加工，专业定尺生产瓦楞板，波浪板，"
-        "三角板，不锈钢板，黑钛瓦楞，三角，波浪板均可"
-    )
-    lines.extend(wrap_display(footer_text, table_width))
-    lines.extend([
+DELIVERY_PRINT_CONFIG_KEY = "delivery_print_config"
+DELIVERY_PRINT_CONFIG_DEFAULT = {
+    "title": "方圆五金出货单",
+    "copies": ["客户联", "财务联", "存根联"],
+    "unit": "件",
+    "footer_lines": [
+        "本厂大型激光切割，剪板，折叠对外加工，专业定尺生产瓦楞板，波浪板，三角板，不锈钢板，黑钛瓦楞，三角，波浪板均可",
         "定尺生产！可提供火锅桌架全套配件！",
         "门市地址：东段君良仓储西800米路北  厂址：东段速8酒店后面50米道东",
         "电话：15226662348    13582962755（微信同步）",
-        "送货人：厂内司机     收货人签字：",
-        "",
-        "\n",
-    ])
-    return "\n".join(lines)
+    ],
+    "delivery_person_label": "送货人",
+    "delivery_person_value": "",
+    "receiver_sign_label": "收货人签字",
+}
 
 
-def build_multi_copy_print_text(order: Order, copy_labels: list[str]) -> str:
-    return ("\n" + "=" * 86 + "\n").join(
-        build_delivery_print_text(order, label).rstrip()
-        for label in copy_labels
-    ) + "\n"
+def split_lines(value: str) -> list[str]:
+    return [line.strip() for line in str(value or "").splitlines() if line.strip()]
 
 
-def build_a4_print_text(order: Order) -> str:
-    width = 96
-    separator = "=" * width
-    lines = [
-        fit_display("方圆五金出货单", width, "center"),
-        fit_display(f"订单号：{order.order_no}    日期：{order.created_at.strftime('%Y-%m-%d') if order.created_at else ''}", width, "right"),
-        separator,
-        f"客户：{order.customer or ''}",
-        f"电话：{order.phone or ''}",
-        f"商品：{order.item_name or ''}",
-        f"规格：{order.size or ''}",
-        f"数量：{order.quantity or 0}    单价：{format_money(order.unit_price)}    货款：{format_money(order.total_amount)}",
-        f"已收：{format_money(order.paid_amount)}    待结：{format_money(order.unpaid_amount)}    付款状态：{order.payment_status or ''}",
-        separator,
-        "备注：",
-    ]
-    lines.extend(wrap_display(order.remark or "无", width))
-    lines.extend([
-        separator,
-        "本厂大型激光切割，剪板，折叠对外加工，专业定尺生产瓦楞板，波浪板，三角板等。",
-        "门市地址：东段君良仓储西800米路北  厂址：东段速8酒店后面50米道东",
-        "电话：15226662348    13582962755（微信同步）",
-        "",
-        "送货人：厂内司机                              收货人签字：",
-        "",
-        "\n",
-    ])
-    return "\n".join(lines)
+def normalize_delivery_print_config(value) -> dict:
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            value = {}
+    if not isinstance(value, dict):
+        value = {}
+
+    config = dict(DELIVERY_PRINT_CONFIG_DEFAULT)
+    config.update({key: value.get(key) for key in DELIVERY_PRINT_CONFIG_DEFAULT if value.get(key) is not None})
+
+    title = str(config.get("title") or "").strip()
+    unit = str(config.get("unit") or "").strip()
+    delivery_label = str(config.get("delivery_person_label") or "").strip()
+    receiver_label = str(config.get("receiver_sign_label") or "").strip()
+
+    copies = config.get("copies")
+    if isinstance(copies, str):
+        copies = split_lines(copies)
+    if not isinstance(copies, list):
+        copies = []
+    copies = [str(item or "").strip() for item in copies if str(item or "").strip()]
+    if len(copies) < 3:
+        copies = list(DELIVERY_PRINT_CONFIG_DEFAULT["copies"])
+    else:
+        copies = copies[:3]
+
+    footer_lines = config.get("footer_lines")
+    if isinstance(footer_lines, str):
+        footer_lines = split_lines(footer_lines)
+    if not isinstance(footer_lines, list):
+        footer_lines = []
+    footer_lines = [str(item or "").strip() for item in footer_lines if str(item or "").strip()]
+    if not footer_lines:
+        footer_lines = list(DELIVERY_PRINT_CONFIG_DEFAULT["footer_lines"])
+
+    return {
+        "title": title or DELIVERY_PRINT_CONFIG_DEFAULT["title"],
+        "copies": copies,
+        "unit": unit or DELIVERY_PRINT_CONFIG_DEFAULT["unit"],
+        "footer_lines": footer_lines,
+        "delivery_person_label": delivery_label or DELIVERY_PRINT_CONFIG_DEFAULT["delivery_person_label"],
+        "delivery_person_value": str(config.get("delivery_person_value") or "").strip(),
+        "receiver_sign_label": receiver_label or DELIVERY_PRINT_CONFIG_DEFAULT["receiver_sign_label"],
+    }
 
 
-def build_receipt_print_text(order: Order) -> str:
-    width = 42
-    line = "-" * width
-    lines = [
-        fit_display("方圆五金出货单", width, "center"),
-        line,
-        f"单号：{order.order_no}",
-        f"客户：{order.customer or ''}",
-        f"电话：{order.phone or ''}",
-        line,
-    ]
-    lines.extend(wrap_display(f"商品：{order.item_name or ''}", width))
-    lines.extend(wrap_display(f"规格：{order.size or ''}", width))
-    lines.extend([
-        f"数量：{order.quantity or 0}",
-        f"单价：{format_money(order.unit_price)}",
-        f"金额：{format_money(order.total_amount)}",
-        f"已收：{format_money(order.paid_amount)}",
-        f"待结：{format_money(order.unpaid_amount)}",
-        line,
-    ])
-    if order.remark:
-        lines.extend(wrap_display(f"备注：{order.remark}", width))
-        lines.append(line)
-    lines.extend([
-        "电话：15226662348",
-        "      13582962755",
-        "收货人签字：",
-        "",
-        "\n",
-    ])
-    return "\n".join(lines)
+def get_delivery_print_config(db: Session) -> dict:
+    return normalize_delivery_print_config(get_app_setting(db, DELIVERY_PRINT_CONFIG_KEY, "{}"))
 
 
-def verify_print_client(request: Request) -> bool:
-    expected_token = os.getenv("PRINT_CLIENT_TOKEN", "").strip()
-    supplied_token = (
-        request.headers.get("X-Print-Client-Token")
-        or request.query_params.get("token")
-        or ""
-    ).strip()
-    return bool(expected_token) and secrets.compare_digest(supplied_token, expected_token)
-
-
-def get_active_print_job(db: Session, order_id: int):
-    return (
-        db.query(PrintJob)
-        .filter(
-            PrintJob.order_id == order_id,
-            PrintJob.status.in_(["pending", "printing"])
-        )
-        .order_by(PrintJob.id.desc())
-        .first()
+def set_delivery_print_config(db: Session, config: dict):
+    set_app_setting(
+        db,
+        DELIVERY_PRINT_CONFIG_KEY,
+        json.dumps(normalize_delivery_print_config(config), ensure_ascii=False),
     )
-
-
-def queue_print_jobs(
-    db: Session,
-    orders: list[Order],
-    operator: str = "",
-    print_template: str = "auto",
-):
-    queued = []
-    skipped = []
-
-    for order in orders:
-        if order.print_status == "已打印":
-            skipped.append(order)
-            continue
-        active_job = get_active_print_job(db, order.id)
-        if active_job is not None:
-            skipped.append(order)
-            continue
-
-        resolved_template = resolve_print_template(db, order, print_template)
-        job = PrintJob(order_id=order.id, print_template=resolved_template, status="pending")
-        db.add(job)
-        db.flush()
-
-        log_operation(
-            db=db,
-            target_type="order",
-            target_id=order.id,
-            action="queue_print",
-            field_name="print_job",
-            old_value="",
-            new_value=f"job_id={job.id};template={resolved_template}",
-            operator=operator
-        )
-        queued.append(order)
-
-    return queued, skipped
 
 def log_operation(
     db: Session,
@@ -648,6 +409,31 @@ def log_operation(
         operator=operator
     )
     db.add(log)
+
+
+def mark_orders_printed(db: Session, orders: list[Order], operator: str = "") -> tuple[list[Order], list[Order]]:
+    printed = []
+    skipped = []
+    for order in orders:
+        if order.print_status == "已打印":
+            skipped.append(order)
+            continue
+
+        old_value = order.print_status
+        order.print_status = "已打印"
+        log_operation(
+            db=db,
+            target_type="order",
+            target_id=order.id,
+            action="mark_printed",
+            field_name="print_status",
+            old_value=old_value,
+            new_value=order.print_status,
+            operator=operator,
+        )
+        printed.append(order)
+
+    return printed, skipped
 
 
 def get_latest_reversible_log(db: Session, order_id: int):
@@ -735,16 +521,6 @@ def safe_redirect_path(return_to: str, default: str) -> str:
     if return_to.startswith("/") and not return_to.startswith("//"):
         return return_to
     return default
-
-
-def get_print_status_label(status: str):
-    labels = {
-        "pending": "等待打印",
-        "printing": "打印中",
-        "done": "已完成",
-        "failed": "打印失败",
-    }
-    return labels.get(status, status or "未知")
 
 
 ORDER_DRAFT_FIELDS = {
@@ -1596,6 +1372,7 @@ def dashboard(request: Request):
         current_user = get_current_user(request, db)
 
         priority_rank = get_priority_rank_expr()
+        today = date.today()
 
         pending_orders = (
             db.query(Order)
@@ -1609,12 +1386,24 @@ def dashboard(request: Request):
             .all()
         )
 
+        dashboard_stats = {
+            "unprinted": db.query(Order).filter(Order.print_status == "未打印").count(),
+            "unpaid": db.query(Order).filter(Order.payment_status == "未付款").count(),
+            "overdue": db.query(Order).filter(Order.due_date != None, Order.due_date < today, Order.production_status != "已完成").count(),
+            "urgent": db.query(Order).filter(Order.priority_color.in_(["红色", "橙色"]), Order.production_status != "已完成").count(),
+            "waiting_production": db.query(Order).filter(Order.production_status == "未投产").count(),
+            "completed": db.query(Order).filter(Order.production_status == "已完成").count(),
+        }
+
         return templates.TemplateResponse(
             request=request,
             name="dashboard.html",
             context={
                 "current_user": current_user,
-                "pending_orders": pending_orders
+                "pending_orders": pending_orders,
+                "dashboard_stats": dashboard_stats,
+                "today": today,
+                "active_nav": "dashboard",
             }
         )
     finally:
@@ -1634,7 +1423,9 @@ def order_list(
     print_status: str = "未打印",
     date_from: str = "",
     date_to: str = "",
-    sort_by: str = "priority_due"
+    sort_by: str = "priority_due",
+    page: int = 1,
+    per_page: int = 50
 ):
     db: Session = SessionLocal()
     try:
@@ -1679,6 +1470,22 @@ def order_list(
         if parsed_to:
             query = query.filter(Order.created_at <= datetime.combine(parsed_to, datetime.max.time()))
 
+        page = max(page, 1)
+        allowed_page_sizes = [20, 50, 100]
+        if per_page not in allowed_page_sizes:
+            per_page = 50
+
+        filtered_query = query
+        total_count = filtered_query.count()
+        sums = (
+            filtered_query
+            .with_entities(
+                func.coalesce(func.sum(Order.total_amount), 0),
+                func.coalesce(func.sum(Order.unpaid_amount), 0)
+            )
+            .one()
+        )
+
         if sort_by == "payment_first":
             payment_order = case(
                 (Order.payment_status == "未付款", 0),
@@ -1719,10 +1526,14 @@ def order_list(
         else:
             query = query.order_by(Order.order_no.desc())
 
-        orders = query.all()
+        page_count = max((total_count + per_page - 1) // per_page, 1)
+        if page > page_count:
+            page = page_count
 
-        total_amount_sum = sum(order.total_amount or 0 for order in orders)
-        balance_due_sum = sum(order.unpaid_amount or 0 for order in orders)
+        orders = query.offset((page - 1) * per_page).limit(per_page).all()
+
+        total_amount_sum = float(sums[0] or 0)
+        balance_due_sum = float(sums[1] or 0)
 
         return templates.TemplateResponse(
             request=request,
@@ -1738,7 +1549,12 @@ def order_list(
                 "sort_by": sort_by,
                 "total_amount_sum": total_amount_sum,
                 "balance_due_sum": balance_due_sum,
-                "current_user": current_user
+                "current_user": current_user,
+                "total_count": total_count,
+                "page": page,
+                "per_page": per_page,
+                "page_count": page_count,
+                "active_nav": "orders",
             }
         )
     finally:
@@ -2073,6 +1889,7 @@ def order_detail(request: Request, order_id: int):
             context={
                 "order": order,
                 "current_user": current_user,
+                "active_nav": "orders",
                 "logs": (
                     db.query(OperationLog)
                     .filter(OperationLog.target_type == "order", OperationLog.target_id == order.id)
@@ -2080,41 +1897,6 @@ def order_detail(request: Request, order_id: int):
                     .limit(12)
                     .all()
                 )
-            }
-        )
-    finally:
-        db.close()
-
-
-@app.get("/orders/{order_id}/print-preview")
-def print_preview_page(request: Request, order_id: int, print_template: str = "auto"):
-    db: Session = SessionLocal()
-    try:
-        redirect = require_login(request)
-        if redirect:
-            return redirect
-
-        current_user = get_current_user(request, db)
-        order = db.query(Order).filter(Order.id == order_id).first()
-        if order is None:
-            return templates.TemplateResponse(
-                request=request,
-                name="not_found.html",
-                context={"message": f"订单 ID {order_id} 不存在", "current_user": current_user},
-                status_code=404
-            )
-
-        template_key = resolve_print_template(db, order, print_template)
-        return templates.TemplateResponse(
-            request=request,
-            name="print_preview.html",
-            context={
-                "order": order,
-                "current_user": current_user,
-                "template_key": template_key,
-                "requested_template": str(print_template or "auto"),
-                "template_label": PRINT_TEMPLATES[template_key]["label"],
-                "preview_text": build_print_text(order, template_key),
             }
         )
     finally:
@@ -2159,7 +1941,8 @@ def edit_order_page(request: Request, order_id: int):
                 "item_options": item_options,
                 "size_options": size_options,
                 "current_user": current_user,
-                "errors": []
+                "errors": [],
+                "active_nav": "orders",
             }
         )
     finally:
@@ -2211,6 +1994,7 @@ def edit_order_submit(
                     "item_options": get_recent_distinct_values(db, Order.item_name, limit=200),
                     "size_options": get_recent_distinct_values(db, Order.size, limit=200),
                     "current_user": current_user,
+                    "active_nav": "orders",
                     "errors": errors,
                     "form_data": {
                         "customer": customer,
@@ -2274,7 +2058,6 @@ def edit_order_submit(
 def mark_order_printed(
     request: Request,
     order_id: int,
-    print_template: str = Form("auto"),
     return_to: str = Form("")
 ):
     db: Session = SessionLocal()
@@ -2287,20 +2070,28 @@ def mark_order_printed(
 
         order = db.query(Order).filter(Order.id == order_id).first()
         if order is None:
-            add_flash(request, "订单不存在，无法加入打印队列", "error")
+            add_flash(request, "订单不存在，无法打印出货单", "error")
             return RedirectResponse(url="/orders", status_code=303)
 
-        queued, skipped = queue_print_jobs(
-            db,
-            [order],
-            operator=current_user.username if current_user else "",
-            print_template=print_template
-        )
+        printed, skipped = mark_orders_printed(db, [order], operator=current_user.username if current_user else "")
+        print_config = get_delivery_print_config(db)
+        print_orders = [build_delivery_print_order_data(item) for item in printed]
         db.commit()
-        if queued:
-            add_flash(request, f"订单 {order.order_no} 已加入打印队列", "success")
+
+        if printed:
+            return templates.TemplateResponse(
+                request=request,
+                name="delivery_print_a4.html",
+                context={
+                    "orders": print_orders,
+                    "print_config": print_config,
+                    "current_user": current_user,
+                    "auto_print": True,
+                    "return_to": safe_redirect_path(return_to, f"/orders/{order_id}"),
+                },
+            )
         elif skipped:
-            add_flash(request, f"订单 {order.order_no} 已打印或已在打印队列中", "warning")
+            add_flash(request, f"订单 {order.order_no} 已打印，不再重复标记", "warning")
 
         return RedirectResponse(url=safe_redirect_path(return_to, f"/orders/{order_id}"), status_code=303)
     finally:
@@ -2311,7 +2102,6 @@ def mark_order_printed(
 def batch_print_orders(
     request: Request,
     order_ids: list[int] = Form(default=[]),
-    print_template: str = Form("auto"),
     return_to: str = Form("/orders")
 ):
     db: Session = SessionLocal()
@@ -2328,147 +2118,33 @@ def batch_print_orders(
                 .order_by(Order.order_no.asc())
                 .all()
             )
-            queued, skipped = queue_print_jobs(
-                db,
-                orders,
-                operator=current_user.username if current_user else "",
-                print_template=print_template
-            )
+            printed, skipped = mark_orders_printed(db, orders, operator=current_user.username if current_user else "")
+            print_config = get_delivery_print_config(db)
+            print_orders = [build_delivery_print_order_data(order) for order in printed]
             db.commit()
+
+            if printed:
+                return templates.TemplateResponse(
+                    request=request,
+                    name="delivery_print_a4.html",
+                    context={
+                        "orders": print_orders,
+                        "print_config": print_config,
+                        "current_user": current_user,
+                        "auto_print": True,
+                        "return_to": safe_redirect_path(return_to, "/orders"),
+                    },
+                )
+
             add_flash(
                 request,
-                f"已加入 {len(queued)} 个打印任务"
-                + (f"，跳过 {len(skipped)} 个已打印或队列中订单" if skipped else ""),
-                "success" if queued else "warning",
+                "所选订单均已打印，未生成新的出货单",
+                "warning",
             )
         else:
             add_flash(request, "请先选择要发送打印的订单", "warning")
 
         return RedirectResponse(url=safe_redirect_path(return_to, "/orders"), status_code=303)
-    finally:
-        db.close()
-
-
-@app.post("/api/print-client/next")
-async def print_client_next(request: Request):
-    if not verify_print_client(request):
-        return JSONResponse({"ok": False, "message": "打印客户端令牌无效或服务器未配置 PRINT_CLIENT_TOKEN"}, status_code=401)
-
-    payload = await request.json()
-    client_id = str(payload.get("client_id") or "win7-print-client").strip()
-
-    db: Session = SessionLocal()
-    try:
-        stale_before = datetime.utcnow() - timedelta(minutes=10)
-        job = (
-            db.query(PrintJob)
-            .join(Order, Order.id == PrintJob.order_id)
-            .filter(
-                Order.print_status == "未打印",
-                or_(
-                    PrintJob.status == "pending",
-                    (PrintJob.status == "printing") & (PrintJob.claimed_at < stale_before)
-                )
-            )
-            .order_by(PrintJob.id.asc())
-            .first()
-        )
-
-        if job is None:
-            return {"ok": True, "has_job": False}
-
-        order = db.query(Order).filter(Order.id == job.order_id).first()
-        if order is None:
-            job.status = "failed"
-            job.error_message = "订单不存在"
-            db.commit()
-            return {"ok": True, "has_job": False}
-
-        job.status = "printing"
-        job.client_id = client_id
-        job.attempts = (job.attempts or 0) + 1
-        job.claimed_at = datetime.utcnow()
-        db.commit()
-
-        return {
-            "ok": True,
-            "has_job": True,
-            "job": {
-                "id": job.id,
-                "order_id": order.id,
-                "order_no": order.order_no,
-                "print_template": normalize_print_template(job.print_template),
-            },
-            "payload": {
-                "format": "text",
-                "template": normalize_print_template(job.print_template),
-                "template_label": PRINT_TEMPLATES[normalize_print_template(job.print_template)]["label"],
-                "text": build_print_text(order, job.print_template),
-            },
-        }
-    finally:
-        db.close()
-
-
-@app.post("/api/print-client/report")
-async def print_client_report(request: Request):
-    if not verify_print_client(request):
-        return JSONResponse({"ok": False, "message": "打印客户端令牌无效或服务器未配置 PRINT_CLIENT_TOKEN"}, status_code=401)
-
-    payload = await request.json()
-    job_id = int(payload.get("job_id") or 0)
-    success = bool(payload.get("success"))
-    error_message = str(payload.get("error") or "").strip()
-    client_id = str(payload.get("client_id") or "win7-print-client").strip()
-
-    db: Session = SessionLocal()
-    try:
-        job = db.query(PrintJob).filter(PrintJob.id == job_id).first()
-        if job is None:
-            return JSONResponse({"ok": False, "message": "打印任务不存在"}, status_code=404)
-
-        order = db.query(Order).filter(Order.id == job.order_id).first()
-        if order is None:
-            job.status = "failed"
-            job.error_message = "订单不存在"
-            db.commit()
-            return JSONResponse({"ok": False, "message": "订单不存在"}, status_code=404)
-
-        job.client_id = client_id
-        if success:
-            old_value = order.print_status
-            order.print_status = "已打印"
-            job.status = "done"
-            job.error_message = ""
-            job.printed_at = datetime.utcnow()
-
-            if old_value != order.print_status:
-                log_operation(
-                    db=db,
-                    target_type="order",
-                    target_id=order.id,
-                    action="mark_printed",
-                    field_name="print_status",
-                    old_value=old_value,
-                    new_value=order.print_status,
-                    operator=client_id
-                )
-        else:
-            job.status = "failed"
-            job.error_message = error_message[:1000] or "打印失败"
-            log_operation(
-                db=db,
-                target_type="order",
-                target_id=order.id,
-                action="print_failed",
-                field_name="print_job",
-                old_value=f"job_id={job.id}",
-                new_value=job.error_message,
-                operator=client_id
-            )
-
-        db.commit()
-        return {"ok": True}
     finally:
         db.close()
 
@@ -2482,37 +2158,31 @@ def print_settings_page(request: Request):
             return redirect
 
         current_user = get_current_user(request, db)
-        customers = (
-            db.query(Order.customer)
-            .filter(Order.customer != "")
-            .distinct()
-            .order_by(Order.customer.asc())
-            .limit(300)
-            .all()
-        )
-        rules = (
-            db.query(PrintTemplateRule)
-            .order_by(PrintTemplateRule.customer_name.asc())
-            .all()
-        )
+        print_config = get_delivery_print_config(db)
         return templates.TemplateResponse(
             request=request,
             name="print_settings.html",
             context={
                 "current_user": current_user,
-                "default_print_template": get_default_print_template(db),
-                "rules": rules,
-                "customers": [row[0] for row in customers if row[0]],
+                "print_config": print_config,
+                "copies_text": "\n".join(print_config["copies"]),
+                "footer_lines_text": "\n".join(print_config["footer_lines"]),
             }
         )
     finally:
         db.close()
 
 
-@app.post("/print-settings/default")
-def update_default_print_template(
+@app.post("/print-settings/delivery-config")
+def update_delivery_print_config(
     request: Request,
-    default_print_template: str = Form("delivery")
+    title: str = Form(""),
+    copies_text: str = Form(""),
+    unit: str = Form(""),
+    footer_lines_text: str = Form(""),
+    delivery_person_label: str = Form(""),
+    delivery_person_value: str = Form(""),
+    receiver_sign_label: str = Form(""),
 ):
     db: Session = SessionLocal()
     try:
@@ -2520,218 +2190,21 @@ def update_default_print_template(
         if redirect:
             return redirect
 
-        template_key = normalize_print_template(default_print_template)
-        set_app_setting(db, "default_print_template", template_key)
-        db.commit()
-        add_flash(request, f"默认打印模板已设置为：{print_template_label(template_key)}", "success")
-        return RedirectResponse(url="/print-settings", status_code=303)
-    finally:
-        db.close()
-
-
-@app.post("/print-settings/rules")
-def save_print_template_rule(
-    request: Request,
-    customer_name: str = Form(...),
-    print_template: str = Form("delivery")
-):
-    db: Session = SessionLocal()
-    try:
-        redirect = require_admin(request, db)
-        if redirect:
-            return redirect
-
-        customer_name = str(customer_name or "").strip()
-        if not customer_name:
-            add_flash(request, "客户名称不能为空", "error")
-            return RedirectResponse(url="/print-settings", status_code=303)
-
-        template_key = normalize_print_template(print_template)
-        rule = db.query(PrintTemplateRule).filter(PrintTemplateRule.customer_name == customer_name).first()
-        if rule is None:
-            rule = PrintTemplateRule(
-                customer_name=customer_name,
-                print_template=template_key,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
-            )
-            db.add(rule)
-        else:
-            rule.print_template = template_key
-            rule.updated_at = datetime.utcnow()
-        db.commit()
-        add_flash(request, f"{customer_name} 的打印模板已设置为：{print_template_label(template_key)}", "success")
-        return RedirectResponse(url="/print-settings", status_code=303)
-    finally:
-        db.close()
-
-
-@app.post("/print-settings/rules/{rule_id}/delete")
-def delete_print_template_rule(request: Request, rule_id: int):
-    db: Session = SessionLocal()
-    try:
-        redirect = require_admin(request, db)
-        if redirect:
-            return redirect
-
-        rule = db.query(PrintTemplateRule).filter(PrintTemplateRule.id == rule_id).first()
-        if rule is not None:
-            db.delete(rule)
-            db.commit()
-            add_flash(request, f"已删除 {rule.customer_name} 的专属模板规则", "success")
-        else:
-            add_flash(request, "规则不存在", "warning")
-        return RedirectResponse(url="/print-settings", status_code=303)
-    finally:
-        db.close()
-
-
-@app.get("/print-jobs")
-@app.get("/print_jobs")
-@app.get("/print-queue")
-@app.get("/print_queue")
-def print_jobs_page(request: Request, status: str = ""):
-    db: Session = SessionLocal()
-    try:
-        redirect = require_login(request)
-        if redirect:
-            return redirect
-
-        current_user = get_current_user(request, db)
-        allowed_statuses = ["", "pending", "printing", "failed", "done"]
-        if status not in allowed_statuses:
-            status = ""
-
-        query = (
-            db.query(PrintJob, Order)
-            .join(Order, Order.id == PrintJob.order_id)
-        )
-        if status:
-            query = query.filter(PrintJob.status == status)
-
-        rows = (
-            query
-            .order_by(PrintJob.id.desc())
-            .limit(200)
-            .all()
-        )
-        jobs = [
+        set_delivery_print_config(
+            db,
             {
-                "job": job,
-                "order": order,
-                "status_label": get_print_status_label(job.status),
-            }
-            for job, order in rows
-        ]
-
-        status_counts = {
-            item_status: db.query(PrintJob).filter(PrintJob.status == item_status).count()
-            for item_status in ["pending", "printing", "failed", "done"]
-        }
-        candidate_orders = (
-            db.query(Order)
-            .filter(Order.print_status == "未打印")
-            .order_by(Order.order_no.desc())
-            .limit(100)
-            .all()
+                "title": title,
+                "copies": split_lines(copies_text),
+                "unit": unit,
+                "footer_lines": split_lines(footer_lines_text),
+                "delivery_person_label": delivery_person_label,
+                "delivery_person_value": delivery_person_value,
+                "receiver_sign_label": receiver_sign_label,
+            },
         )
-        available_orders = [order for order in candidate_orders if get_active_print_job(db, order.id) is None]
-
-        return templates.TemplateResponse(
-            request=request,
-            name="print_jobs.html",
-            context={
-                "jobs": jobs,
-                "status": status,
-                "status_counts": status_counts,
-                "available_orders": available_orders,
-                "current_user": current_user,
-                "default_print_template": get_default_print_template(db),
-                "status_labels": {
-                    "pending": "等待打印",
-                    "printing": "打印中",
-                    "failed": "打印失败",
-                    "done": "已完成",
-                },
-            }
-        )
-    finally:
-        db.close()
-
-
-@app.post("/print-jobs/add-order")
-def add_order_to_print_queue(
-    request: Request,
-    order_id: int = Form(...),
-    print_template: str = Form("auto")
-):
-    db: Session = SessionLocal()
-    try:
-        redirect = require_login(request)
-        if redirect:
-            return redirect
-
-        current_user = get_current_user(request, db)
-        order = db.query(Order).filter(Order.id == order_id).first()
-        if order is not None:
-            queued, skipped = queue_print_jobs(
-                db,
-                [order],
-                operator=current_user.username if current_user else "",
-                print_template=print_template
-            )
-            db.commit()
-            if queued:
-                add_flash(request, f"订单 {order.order_no} 已加入打印队列", "success")
-            elif skipped:
-                add_flash(request, f"订单 {order.order_no} 已打印或已在打印队列中", "warning")
-        else:
-            add_flash(request, "订单不存在，无法加入打印队列", "error")
-
-        return RedirectResponse(url="/print-jobs?status=pending", status_code=303)
-    finally:
-        db.close()
-
-
-@app.post("/print-jobs/{job_id}/retry")
-def retry_print_job(request: Request, job_id: int):
-    db: Session = SessionLocal()
-    try:
-        redirect = require_login(request)
-        if redirect:
-            return redirect
-
-        current_user = get_current_user(request, db)
-        job = db.query(PrintJob).filter(PrintJob.id == job_id).first()
-        if job is not None:
-            order = db.query(Order).filter(Order.id == job.order_id).first()
-            if order is not None:
-                order.print_status = "未打印"
-                job.status = "pending"
-                job.client_id = ""
-                job.error_message = ""
-                job.claimed_at = None
-                job.printed_at = None
-
-                log_operation(
-                    db=db,
-                    target_type="order",
-                    target_id=order.id,
-                    action="retry_print",
-                    field_name="print_job",
-                    old_value=f"job_id={job.id}",
-                    new_value="pending",
-                    operator=current_user.username if current_user else ""
-                )
-
-                db.commit()
-                add_flash(request, f"打印任务 #{job.id} 已重新加入队列", "success")
-            else:
-                add_flash(request, "打印任务关联的订单不存在", "error")
-        else:
-            add_flash(request, "打印任务不存在", "error")
-
-        return RedirectResponse(url="/print-jobs?status=failed", status_code=303)
+        db.commit()
+        add_flash(request, "A4 三联出货单文案已保存", "success")
+        return RedirectResponse(url="/print-settings", status_code=303)
     finally:
         db.close()
 
@@ -2823,7 +2296,11 @@ def mark_order_unpaid(
 
 
 @app.post("/orders/{order_id}/production")
-def mark_order_production(request: Request, order_id: int):
+def mark_order_production(
+    request: Request,
+    order_id: int,
+    return_to: str = Form("")
+):
     db: Session = SessionLocal()
     try:
         redirect = require_login(request)
@@ -2849,13 +2326,20 @@ def mark_order_production(request: Request, order_id: int):
             )
 
             db.commit()
+            add_flash(request, f"订单 {order.order_no} 已标记为已投产", "success")
+        else:
+            add_flash(request, "订单不存在，无法标记投产", "error")
 
-        return RedirectResponse(url=f"/orders/{order_id}", status_code=303)
+        return RedirectResponse(url=safe_redirect_path(return_to, f"/orders/{order_id}"), status_code=303)
     finally:
         db.close()
 
 @app.post("/orders/{order_id}/complete")
-def mark_order_complete(request: Request, order_id: int):
+def mark_order_complete(
+    request: Request,
+    order_id: int,
+    return_to: str = Form("")
+):
     db: Session = SessionLocal()
     try:
         redirect = require_login(request)
@@ -2881,8 +2365,11 @@ def mark_order_complete(request: Request, order_id: int):
             )
 
             db.commit()
+            add_flash(request, f"订单 {order.order_no} 已标记为已完成", "success")
+        else:
+            add_flash(request, "订单不存在，无法标记完成", "error")
 
-        return RedirectResponse(url=f"/orders/{order_id}", status_code=303)
+        return RedirectResponse(url=safe_redirect_path(return_to, f"/orders/{order_id}"), status_code=303)
     finally:
         db.close()
 
@@ -2899,11 +2386,6 @@ def delete_order(request: Request, order_id: int):
         order = db.query(Order).filter(Order.id == order_id).first()
 
         if order is not None:
-            active_job = get_active_print_job(db, order.id)
-            if active_job is not None:
-                add_flash(request, f"订单 {order.order_no} 已在打印队列中，先处理打印任务后再删除", "error")
-                return RedirectResponse(url=f"/orders/{order_id}", status_code=303)
-
             log_operation(
                 db=db,
                 target_type="order",
@@ -2915,7 +2397,6 @@ def delete_order(request: Request, order_id: int):
                 operator=current_user.username if current_user else ""
             )
 
-            db.query(PrintJob).filter(PrintJob.order_id == order.id).delete(synchronize_session=False)
             db.delete(order)
             db.commit()
             add_flash(request, f"订单 {order.order_no} 已删除", "success")

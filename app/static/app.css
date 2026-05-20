@@ -1,3 +1,5 @@
+@import url("/static/css/app.css");
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -214,59 +216,6 @@ body {
   color: #4b5563;
 }
 
-.print-status-tabs {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 18px;
-}
-
-.status-tab {
-  display: inline-flex;
-  align-items: center;
-  min-height: 36px;
-  padding: 0 13px;
-  border-radius: 999px;
-  background: #e5e7eb;
-  color: #111827;
-  text-decoration: none;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.status-tab.active {
-  background: #2563eb;
-  color: #ffffff;
-}
-
-.print-job-pending {
-  background: #eff6ff;
-  color: #1d4ed8;
-}
-
-.print-job-printing {
-  background: #fef9c3;
-  color: #a16207;
-}
-
-.print-job-done {
-  background: #ecfdf5;
-  color: #047857;
-}
-
-.print-job-failed {
-  background: #fef2f2;
-  color: #b91c1c;
-}
-
-.job-error-row td {
-  background: #fef2f2;
-  color: #991b1b;
-  font-size: 13px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-}
-
 .empty-box {
   background: white;
   border-radius: 16px;
@@ -328,29 +277,6 @@ body {
   font: inherit;
 }
 
-.template-select {
-  flex: 0 1 180px;
-  min-width: 150px;
-}
-
-.print-template-switcher {
-  margin-bottom: 14px;
-}
-
-.print-preview-card {
-  overflow: auto;
-}
-
-.print-preview-card pre {
-  margin: 0;
-  min-width: max-content;
-  font-family: "Courier New", monospace;
-  font-size: 14px;
-  line-height: 1.45;
-  color: #111827;
-  white-space: pre;
-}
-
 .settings-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -370,7 +296,8 @@ body {
 }
 
 .settings-form input,
-.settings-form select {
+.settings-form select,
+.settings-form textarea {
   min-width: 0;
   width: 100%;
   padding: 10px 12px;
@@ -381,31 +308,195 @@ body {
   font: inherit;
 }
 
-.settings-rule-list {
-  display: grid;
-  gap: 10px;
+.settings-form textarea {
+  resize: vertical;
+  line-height: 1.5;
 }
 
-.settings-rule-item {
+.compact-settings-grid {
+  margin-bottom: 0;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.print-document-body {
+  margin: 0;
+  background: #eef2f7;
+  color: #111827;
+}
+
+.print-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 12px;
-  padding: 12px 0;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.94);
   border-bottom: 1px solid #e5e7eb;
 }
 
-.settings-rule-item:last-child {
-  border-bottom: 0;
-}
-
-.settings-rule-item div {
+.delivery-print-document {
   display: grid;
-  gap: 4px;
+  gap: 16px;
+  justify-content: center;
+  padding: 18px 0;
 }
 
-.settings-rule-item span {
-  color: #6b7280;
+.print-page {
+  width: 194mm;
+  height: 281mm;
+  background: #ffffff;
+  box-sizing: border-box;
+  padding: 0;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.16);
+  page-break-after: always;
+}
+
+.print-page:last-child {
+  page-break-after: auto;
+}
+
+.delivery-copy {
+  height: calc(281mm / 3);
+  box-sizing: border-box;
+  padding: 5mm 7mm 4mm;
+  display: grid;
+  grid-template-rows: auto auto auto 1fr;
+  gap: 2.4mm;
+  overflow: hidden;
+}
+
+.copy-divider {
+  border-bottom: 1px dashed #6b7280;
+}
+
+.delivery-copy-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8mm;
+}
+
+.delivery-title-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 5mm;
+}
+
+.delivery-title-wrap h1 {
+  margin: 0;
+  font-size: 18pt;
+  line-height: 1.1;
+  letter-spacing: 0;
+}
+
+.delivery-title-wrap span {
+  font-size: 10.5pt;
+  font-weight: 700;
+}
+
+.delivery-order-meta {
+  display: grid;
+  gap: 1.5mm;
+  min-width: 58mm;
+  text-align: right;
+  font-size: 9pt;
+  line-height: 1.2;
+}
+
+.delivery-customer-row {
+  display: grid;
+  grid-template-columns: 1fr 70mm;
+  gap: 5mm;
+  font-size: 10pt;
+  line-height: 1.3;
+}
+
+.delivery-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 8.6pt;
+  line-height: 1.25;
+}
+
+.delivery-table th,
+.delivery-table td {
+  border: 1px solid #111827;
+  padding: 1.3mm 1.5mm;
+  vertical-align: top;
+  word-break: break-word;
+}
+
+.delivery-table th {
+  text-align: center;
+  font-weight: 700;
+}
+
+.delivery-table tfoot td {
+  font-weight: 700;
+}
+
+.delivery-table .col-name {
+  width: 25%;
+}
+
+.delivery-table .col-spec {
+  width: 16%;
+}
+
+.delivery-table .col-unit {
+  width: 8%;
+}
+
+.delivery-table .col-qty {
+  width: 8%;
+}
+
+.delivery-table .col-price,
+.delivery-table .col-amount {
+  width: 11%;
+}
+
+.delivery-table .col-remark {
+  width: 21%;
+}
+
+.delivery-table .blank-row td {
+  height: 6mm;
+}
+
+.delivery-copy-footer {
+  display: grid;
+  align-content: end;
+  gap: 2mm;
+  font-size: 8.4pt;
+  line-height: 1.35;
+}
+
+.delivery-footer-lines {
+  display: grid;
+  gap: 0.6mm;
+}
+
+.delivery-footer-lines p {
+  margin: 0;
+}
+
+.delivery-sign-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10mm;
+  font-size: 9.5pt;
+  line-height: 1.3;
 }
 
 .public-page {
@@ -1815,8 +1906,7 @@ body {
     display: none;
   }
 
-  .dashboard-table,
-  .print-jobs-table {
+  .dashboard-table {
     display: none;
   }
 
@@ -2018,31 +2108,19 @@ body {
   }
 
   .action-row form,
-  .page-actions form,
-  .print-template-switcher .inline-picker-form {
+  .page-actions form {
     width: 100%;
     display: grid;
     grid-template-columns: 1fr;
   }
 
-  .compact-select,
-  .template-select {
+  .compact-select {
     width: 100%;
     min-width: 0;
   }
 
-  .print-preview-card pre {
-    font-size: 12px;
-  }
-
   .settings-grid {
     grid-template-columns: 1fr;
-  }
-
-  .settings-rule-item {
-    align-items: stretch;
-    display: grid;
-    grid-template-columns: 1fr auto;
   }
 
   .manage-product-actions {
@@ -2067,6 +2145,52 @@ body {
     width: 100%;
     text-align: center;
     box-sizing: border-box;
+  }
+}
+
+@page {
+  size: A4 portrait;
+  margin: 8mm;
+}
+
+@media print {
+  html,
+  body {
+    width: 210mm;
+    min-height: 297mm;
+    background: #ffffff;
+  }
+
+  .no-print,
+  .print-toolbar,
+  .sidebar,
+  .bottom-nav,
+  .mobile-menu-button,
+  .mobile-new-order-fab {
+    display: none !important;
+  }
+
+  .print-document-body {
+    background: #ffffff;
+  }
+
+  .delivery-print-document {
+    display: block;
+    padding: 0;
+  }
+
+  .print-page {
+    width: 194mm;
+    height: 281mm;
+    margin: 0;
+    box-shadow: none;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .print-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
   }
 }
 .priority-badge {

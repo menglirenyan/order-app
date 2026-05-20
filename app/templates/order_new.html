@@ -17,10 +17,10 @@
             <a class="nav-link" href="/dashboard">工作台</a>
             <a class="nav-link" href="/orders">订单列表</a>
             <a class="nav-link active" href="/orders/new">新建订单</a>
-            <a class="nav-link" href="/print-jobs">打印队列</a>
             <a class="nav-link" href="/showcase">货物展示</a>
             <a class="nav-link" href="/showcase/manage">展示管理</a>
             {% if current_user.is_admin %}
+            <a class="nav-link" href="/print-settings">打印设置</a>
             <a class="nav-link" href="/users">用户管理</a>
             {% endif %}
             <a class="nav-link" href="/logout">退出登录</a>

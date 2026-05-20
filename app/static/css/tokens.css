@@ -1,0 +1,20 @@
+:root {
+  --font-sans: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
+  --color-bg: #f4f6f8;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f8fafc;
+  --color-text: #172033;
+  --color-muted: #667085;
+  --color-border: #d9e0ea;
+  --color-primary: #0f5fb8;
+  --color-primary-strong: #0b4f9c;
+  --color-danger: #c81e1e;
+  --color-warning: #b45309;
+  --color-success: #047857;
+  --color-sidebar: #111827;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --shadow-card: 0 6px 20px rgba(15, 23, 42, 0.07);
+  --shadow-dialog: 0 24px 64px rgba(15, 23, 42, 0.3);
+}

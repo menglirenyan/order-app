@@ -1,0 +1,50 @@
+.production-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filter-form {
+  grid-template-columns: minmax(220px, 1.8fr) repeat(4, minmax(140px, 1fr)) repeat(2, minmax(150px, 1fr)) auto auto;
+}
+
+.pagination-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  color: var(--color-muted);
+  font-size: 14px;
+}
+
+.pagination-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.status-production-未投产 {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.status-production-已投产 {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.status-production-已完成 {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+@media (max-width: 768px) {
+  .filter-form {
+    grid-template-columns: 1fr;
+  }
+
+  .pagination-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

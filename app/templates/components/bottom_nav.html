@@ -1,0 +1,5 @@
+<nav class="bottom-nav app-bottom-nav" aria-label="底部快捷导航">
+    <a class="{% if active_nav == 'dashboard' %}active{% endif %}" href="/dashboard">工作台</a>
+    <a class="{% if active_nav == 'orders' %}active{% endif %}" href="/orders">订单</a>
+    <a class="{% if active_nav == 'order_new' %}active{% endif %}" href="/orders/new">新建</a>
+</nav>

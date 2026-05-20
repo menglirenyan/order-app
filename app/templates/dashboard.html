@@ -1,152 +1,174 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>工作台</title>
-    <link rel="stylesheet" href="/static/app.css">
-    <script src="/static/mobile_ui.js" defer></script>
-</head>
-<body>
-<div class="layout">
-    <aside class="sidebar">
-        <h2>方圆订单系统</h2>
-        <nav>
-            <a class="nav-link active" href="/dashboard">工作台</a>
-            <a class="nav-link" href="/orders">订单列表</a>
-            <a class="nav-link" href="/orders/new">新建订单</a>
-            <a class="nav-link" href="/print-jobs">打印队列</a>
-            <a class="nav-link" href="/showcase">货物展示</a>
-            <a class="nav-link" href="/showcase/manage">展示管理</a>
-            {% if current_user.is_admin %}
-            <a class="nav-link" href="/users">用户管理</a>
-            {% endif %}
-            <a class="nav-link" href="/logout">退出登录</a>
-        </nav>
-    </aside>
+{% extends "layouts/admin.html" %}
+{% from "components/status_badge.html" import status_badge, priority_badge %}
 
-    <main class="content">
-        <div class="page-header">
-            <div>
-                <h1>未打印订单</h1>
-                <p>当前用户：{{ current_user.username }}</p>
-            </div>
-        </div>
-        {% include "_flash.html" %}
+{% block title %}工作台{% endblock %}
 
-        {% if pending_orders %}
-        <div class="card">
-            <table class="data-table dashboard-table">
-                <thead>
-                    <tr>
-                        <th>订单号</th>
-                        <th>客户</th>
-                        <th>商品</th>
-                        <th>尺寸</th>
-                        <th>优先级</th>
-                        <th>截至日期</th>
-                        <th>备注</th>
-                        <th>已收</th>
-                        <th>待结</th>
-                        <th>付款状态</th>
-                        <th>操作</th>
-                    </tr>
-                </thead>
-                <tbody>
-                {% for order in pending_orders %}
-                    <tr>
-                        <td>{{ order.order_no }}</td>
-                        <td>{{ order.customer }}</td>
-                        <td>{{ order.item_name }}</td>
-                        <td>{{ order.size }}</td>
-                        <td>
-                            <span class="priority-badge priority-{{ order.priority_color }}">
-                                {{ order.priority_color }}
-                            </span>
-                        </td>
-                        <td>{{ order.due_date or "未设置" }}</td>
-                        <td>{{ order.remark or "无" }}</td>
-                        <td>{{ order.paid_amount }}</td>
-                        <td>{{ order.unpaid_amount }}</td>
-                        <td><span class="status-badge status-payment-{{ order.payment_status }}">{{ order.payment_status }}</span></td>
-                        <td>
-                            <div class="table-action-row">
-                                <form action="/orders/{{ order.id }}/print" method="post" onsubmit="return confirm('确认加入打印队列？');">
-                                    <input type="hidden" name="return_to" value="/dashboard">
-                                    <button class="btn-secondary" type="submit">打印</button>
-                                </form>
-                                <a class="btn-link" href="/orders/{{ order.id }}/edit">修改</a>
-                            </div>
-                        </td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-            <div class="mobile-order-list">
-                {% for order in pending_orders %}
-                <article class="mobile-order-card" data-mobile-toggle-card>
-                    <div class="mobile-order-head">
-                        <strong>{{ order.order_no }}</strong>
-                        <span>点击展开</span>
-                    </div>
-                    <div class="mobile-order-summary">
-                        <div class="mobile-order-main">
-                            <div class="mobile-order-title">{{ order.customer }} - {{ order.item_name }}</div>
-                            <div class="mobile-order-subtitle">截至：{{ order.due_date or "未设置" }}</div>
-                        </div>
-                        <div class="mobile-order-amount">待结 {{ order.unpaid_amount }}</div>
-                    </div>
-                    <div class="mobile-order-statuses">
-                        <span class="priority-badge priority-{{ order.priority_color }}">{{ order.priority_color }}</span>
-                        <span class="status-badge status-payment-{{ order.payment_status }}">{{ order.payment_status }}</span>
-                    </div>
-                    <div class="mobile-order-more">点击查看完整信息</div>
-                    <div class="mobile-order-details">
-                        <div class="mobile-order-meta">
-                            <span>客户：{{ order.customer }}</span>
-                            <span>商品：{{ order.item_name }}</span>
-                            <span>尺寸：{{ order.size or "无" }}</span>
-                            <span>优先级：{{ order.priority_color }}</span>
-                            <span>截至：{{ order.due_date or "未设置" }}</span>
-                            <span>已收：{{ order.paid_amount }}</span>
-                            <span>待结：{{ order.unpaid_amount }}</span>
-                            <span>付款：<span class="status-badge status-payment-{{ order.payment_status }}">{{ order.payment_status }}</span></span>
-                            <span>备注：{{ order.remark or "无" }}</span>
-                        </div>
-                        <div class="mobile-card-actions">
-                            <form action="/orders/{{ order.id }}/print" method="post" onsubmit="return confirm('确认加入打印队列？');">
-                                <input type="hidden" name="return_to" value="/dashboard">
-                                <button class="btn-primary mobile-order-action" type="submit">加入打印队列</button>
-                            </form>
-                            {% if order.payment_status == "未付款" %}
-                            <form action="/orders/{{ order.id }}/paid" method="post" onsubmit="return confirm('确认该订单已结清？');">
-                                <input type="hidden" name="return_to" value="/dashboard">
-                                <button class="btn-secondary mobile-order-action" type="submit">标记已付款</button>
-                            </form>
-                            {% else %}
-                            <form action="/orders/{{ order.id }}/unpaid" method="post" onsubmit="return confirm('确认改回未付款？');">
-                                <input type="hidden" name="return_to" value="/dashboard">
-                                <button class="btn-secondary mobile-order-action" type="submit">改回未付款</button>
-                            </form>
-                            {% endif %}
-                            <a class="btn-secondary mobile-order-action" href="/orders/{{ order.id }}/edit">修改订单</a>
-                        </div>
-                    </div>
-                </article>
-                {% endfor %}
-            </div>
-        </div>
-        {% else %}
-        <div class="empty-box">
-            当前没有未打印订单。
-        </div>
-        {% endif %}
-    </main>
+{% block page_header %}
+<div class="page-header">
+    <div class="page-header-stack">
+        <span class="page-kicker">今日待处理</span>
+        <h1>老板工作台</h1>
+        <p>先看异常和急单，再处理生产、收款和打印。当前用户：{{ current_user.username }}</p>
+    </div>
+    <div class="page-actions mobile-compact-actions">
+        <a class="btn-primary" href="/orders/new">新建订单</a>
+        <a class="btn-secondary" href="/orders">查看全部订单</a>
+    </div>
 </div>
-<nav class="bottom-nav">
-    <a class="active" href="/dashboard">工作台</a>
-    <a href="/orders">订单</a>
-    <a href="/orders/new">新建</a>
-</nav>
-</body>
-</html>
+{% endblock %}
+
+{% block content %}
+<section class="metric-grid" aria-label="订单关键状态">
+    <a class="metric-card metric-warning" href="/orders?print_status=未打印">
+        <strong>{{ dashboard_stats.unprinted }}</strong>
+        <span>未打印</span>
+    </a>
+    <a class="metric-card metric-danger" href="/orders?payment_status=未付款&print_status=">
+        <strong>{{ dashboard_stats.unpaid }}</strong>
+        <span>未付款</span>
+    </a>
+    <a class="metric-card metric-danger" href="/orders?sort_by=priority_due&print_status=">
+        <strong>{{ dashboard_stats.overdue }}</strong>
+        <span>已逾期</span>
+    </a>
+    <a class="metric-card metric-warning" href="/orders?sort_by=priority_due&print_status=">
+        <strong>{{ dashboard_stats.urgent }}</strong>
+        <span>红/橙急单</span>
+    </a>
+    <a class="metric-card" href="/orders?production_status=未投产&print_status=">
+        <strong>{{ dashboard_stats.waiting_production }}</strong>
+        <span>待投产</span>
+    </a>
+    <a class="metric-card metric-success" href="/orders?production_status=已完成&print_status=">
+        <strong>{{ dashboard_stats.completed }}</strong>
+        <span>已完成</span>
+    </a>
+</section>
+
+{% if pending_orders %}
+<section class="card">
+    <div class="bulk-print-bar">
+        <div>
+            <h2 class="section-title">未打印待办</h2>
+            <div class="bulk-print-hint">按优先级和截至日期排序，适合每天先处理。</div>
+        </div>
+        <a class="btn-secondary" href="/orders?print_status=未打印">进入批量打印</a>
+    </div>
+    <table class="data-table dashboard-table">
+        <thead>
+            <tr>
+                <th>订单号</th>
+                <th>客户</th>
+                <th>商品</th>
+                <th>尺寸</th>
+                <th>优先级</th>
+                <th>截至日期</th>
+                <th>已收/待结</th>
+                <th>状态</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for order in pending_orders %}
+            <tr>
+                <td>{{ order.order_no }}</td>
+                <td>{{ order.customer }}</td>
+                <td>{{ order.item_name }}</td>
+                <td>{{ order.size or "-" }}</td>
+                <td>{{ priority_badge(order.priority_color) }}</td>
+                <td>{{ order.due_date or "未设置" }}</td>
+                <td>{{ format_money(order.paid_amount) }} / {{ format_money(order.unpaid_amount) }}</td>
+                <td>
+                    {{ status_badge("payment", order.payment_status) }}
+                    {{ status_badge("production", order.production_status) }}
+                    {{ status_badge("print", order.print_status) }}
+                </td>
+                <td>
+                    <div class="table-action-row">
+                        {% if order.production_status == "未投产" %}
+                        <form action="/orders/{{ order.id }}/production" method="post" data-confirm="确认把该订单标记为已投产？">
+                            <input type="hidden" name="return_to" value="/dashboard">
+                            <button class="btn-secondary" type="submit">投产</button>
+                        </form>
+                        {% elif order.production_status == "已投产" %}
+                        <form action="/orders/{{ order.id }}/complete" method="post" data-confirm="确认该订单生产已完成？">
+                            <input type="hidden" name="return_to" value="/dashboard">
+                            <button class="btn-secondary" type="submit">完成</button>
+                        </form>
+                        {% endif %}
+                        <form action="/orders/{{ order.id }}/print" method="post" data-confirm="确认打印出货单？点击后订单会标记为已打印。">
+                            <input type="hidden" name="return_to" value="/dashboard">
+                            <button class="btn-primary" type="submit">打印</button>
+                        </form>
+                        <a class="btn-link" href="/orders/{{ order.id }}">详情</a>
+                    </div>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    <div class="mobile-order-list">
+        {% for order in pending_orders %}
+        <article class="mobile-order-card" data-mobile-toggle-card>
+            <div class="mobile-order-head">
+                <strong>{{ order.order_no }}</strong>
+                <span>点击展开</span>
+            </div>
+            <div class="mobile-order-summary">
+                <div class="mobile-order-main">
+                    <div class="mobile-order-title">{{ order.customer }} - {{ order.item_name }}</div>
+                    <div class="mobile-order-subtitle">截至：{{ order.due_date or "未设置" }} · {{ order.size or "无尺寸" }}</div>
+                </div>
+                <div class="mobile-order-amount">待结 {{ format_money(order.unpaid_amount) }}</div>
+            </div>
+            <div class="mobile-order-statuses">
+                {{ priority_badge(order.priority_color) }}
+                {{ status_badge("payment", order.payment_status) }}
+                {{ status_badge("production", order.production_status) }}
+                {{ status_badge("print", order.print_status) }}
+            </div>
+            <div class="mobile-order-more">点击查看完整信息</div>
+            <div class="mobile-order-details">
+                <div class="mobile-order-meta">
+                    <span>客户：{{ order.customer }}</span>
+                    <span>商品：{{ order.item_name }}</span>
+                    <span>尺寸：{{ order.size or "无" }}</span>
+                    <span>已收：{{ format_money(order.paid_amount) }}</span>
+                    <span>待结：{{ format_money(order.unpaid_amount) }}</span>
+                    <span>备注：{{ order.remark or "无" }}</span>
+                </div>
+                <div class="mobile-card-actions">
+                    {% if order.production_status == "未投产" %}
+                    <form action="/orders/{{ order.id }}/production" method="post" data-confirm="确认把该订单标记为已投产？">
+                        <input type="hidden" name="return_to" value="/dashboard">
+                        <button class="btn-secondary mobile-order-action" type="submit">标记投产</button>
+                    </form>
+                    {% elif order.production_status == "已投产" %}
+                    <form action="/orders/{{ order.id }}/complete" method="post" data-confirm="确认该订单生产已完成？">
+                        <input type="hidden" name="return_to" value="/dashboard">
+                        <button class="btn-secondary mobile-order-action" type="submit">标记完成</button>
+                    </form>
+                    {% endif %}
+                    {% if order.payment_status == "未付款" %}
+                    <form action="/orders/{{ order.id }}/paid" method="post" data-confirm="确认该订单已结清？">
+                        <input type="hidden" name="return_to" value="/dashboard">
+                        <button class="btn-secondary mobile-order-action" type="submit">标记已付款</button>
+                    </form>
+                    {% endif %}
+                    <form action="/orders/{{ order.id }}/print" method="post" data-confirm="确认打印出货单？点击后订单会标记为已打印。">
+                        <input type="hidden" name="return_to" value="/dashboard">
+                        <button class="btn-primary mobile-order-action" type="submit">打印出货单</button>
+                    </form>
+                    <a class="btn-secondary mobile-order-action" href="/orders/{{ order.id }}/edit">修改订单</a>
+                </div>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+{% else %}
+{% with title="当前没有未打印订单", message="可以新建订单，或到订单列表查看已打印和已完成记录。" %}
+    {% include "components/empty_state.html" %}
+{% endwith %}
+{% endif %}
+{% endblock %}

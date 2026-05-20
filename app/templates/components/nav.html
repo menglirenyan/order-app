@@ -1,0 +1,15 @@
+<aside class="sidebar app-sidebar" aria-label="主导航">
+    <h2>方圆订单系统</h2>
+    <nav>
+        <a class="nav-link {% if active_nav == 'dashboard' %}active{% endif %}" href="/dashboard">工作台</a>
+        <a class="nav-link {% if active_nav == 'orders' %}active{% endif %}" href="/orders">订单列表</a>
+        <a class="nav-link {% if active_nav == 'order_new' %}active{% endif %}" href="/orders/new">新建订单</a>
+        <a class="nav-link {% if active_nav == 'showcase' %}active{% endif %}" href="/showcase">货物展示</a>
+        <a class="nav-link {% if active_nav == 'showcase_manage' %}active{% endif %}" href="/showcase/manage">展示管理</a>
+        {% if current_user and current_user.is_admin %}
+        <a class="nav-link {% if active_nav == 'print_settings' %}active{% endif %}" href="/print-settings">打印设置</a>
+        <a class="nav-link {% if active_nav == 'users' %}active{% endif %}" href="/users">用户管理</a>
+        {% endif %}
+        <a class="nav-link" href="/logout">退出登录</a>
+    </nav>
+</aside>

@@ -1,182 +1,106 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <title>编辑订单</title>
-    <link rel="stylesheet" href="/static/app.css">
-    <script src="/static/mobile_ui.js" defer></script>
-</head>
-<body>
-<div class="layout">
-    <aside class="sidebar">
-        <h2>方圆订单系统</h2>
-        <nav>
-            <a class="nav-link" href="/dashboard">工作台</a>
-            <a class="nav-link" href="/orders">订单列表</a>
-            <a class="nav-link" href="/orders/new">新建订单</a>
-            <a class="nav-link" href="/print-jobs">打印队列</a>
-            <a class="nav-link" href="/showcase">货物展示</a>
-            <a class="nav-link" href="/showcase/manage">展示管理</a>
-            {% if current_user.is_admin %}
-            <a class="nav-link" href="/users">用户管理</a>
-            {% endif %}
-            <a class="nav-link" href="/logout">退出登录</a>
-        </nav>
-    </aside>
+{% extends "layouts/admin.html" %}
 
-    <main class="content">
-        <div class="page-header">
-            <div>
-                <h1>编辑订单</h1>
-                <p>订单号：{{ order.order_no }}</p>
+{% block title %}编辑订单{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+    <div class="page-header-stack">
+        <span class="page-kicker">编辑订单</span>
+        <h1>编辑订单</h1>
+        <p>订单号：{{ order.order_no }}</p>
+    </div>
+    <div class="page-actions mobile-compact-actions">
+        <a class="btn-secondary" href="/orders/{{ order.id }}">返回详情</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<section class="card mobile-form-card">
+    {% if errors %}
+    <ul class="form-error-list">
+        {% for error in errors %}
+        <li>{{ error }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+    <form action="/orders/{{ order.id }}/edit" method="post" class="mobile-order-form" data-confirm="确认保存本次修改？">
+        <div class="form-item">
+            <label>客户名称 <span class="required-star">*</span></label>
+            <div class="suggest-wrap">
+                <input type="text" name="customer" id="customer-input" value="{{ form_data.get('customer', order.customer) if form_data is defined else order.customer }}" autocomplete="off" required>
+                <div class="suggest-box" id="customer-suggest"></div>
             </div>
         </div>
-        {% include "_flash.html" %}
 
-        <div class="card mobile-form-card">
-            {% if errors %}
-            <ul class="form-error-list">
-                {% for error in errors %}
-                <li>{{ error }}</li>
-                {% endfor %}
-            </ul>
-            {% endif %}
-            <form action="/orders/{{ order.id }}/edit" method="post" class="mobile-order-form">
-                <div class="form-item">
-                    <label>客户名称 <span class="required-star">*</span></label>
-                    <div class="suggest-wrap">
-                        <input type="text" name="customer" id="customer-input" value="{{ form_data.get('customer', order.customer) if form_data is defined else order.customer }}" autocomplete="off" required>
-                        <div class="suggest-box" id="customer-suggest"></div>
-                    </div>
-                </div>
-
-                <div class="form-item form-item-small">
-                    <label>联系电话</label>
-                    <input type="text" name="phone" value="{{ form_data.get('phone', order.phone) if form_data is defined else order.phone }}" inputmode="tel" autocomplete="tel">
-                </div>
-
-                <div class="form-item">
-                    <label>商品名称 <span class="required-star">*</span></label>
-                    <div class="suggest-wrap">
-                        <input type="text" name="item_name" id="item-input" value="{{ form_data.get('item_name', order.item_name) if form_data is defined else order.item_name }}" autocomplete="off" required>
-                        <div class="suggest-box" id="item-suggest"></div>
-                    </div>
-                </div>
-
-                <div class="form-item">
-                    <label>尺寸</label>
-                    <div class="suggest-wrap">
-                        <input type="text" name="size" id="size-input" value="{{ form_data.get('size', order.size) if form_data is defined else order.size }}" autocomplete="off">
-                        <div class="suggest-box" id="size-suggest"></div>
-                    </div>
-                </div>
-
-                <div class="form-item">
-                    <label>数量 <span class="required-star">*</span></label>
-                    <input type="number" name="quantity" min="1" step="1" value="{{ form_data.get('quantity', order.quantity) if form_data is defined else order.quantity }}" required>
-                </div>
-
-                <div class="form-item">
-                    <label>单价 <span class="required-star">*</span></label>
-                    <input type="number" name="unit_price" step="0.01" min="0" value="{{ form_data.get('unit_price', order.unit_price) if form_data is defined else order.unit_price }}" required>
-                </div>
-
-                <div class="form-item">
-                    <label>已收金额</label>
-                    <input type="number" name="paid_amount" step="0.01" min="0" value="{{ form_data.get('paid_amount', order.paid_amount) if form_data is defined else order.paid_amount }}">
-                    <small class="help-text">修改已收金额会重新计算未结清订单的待结金额。</small>
-                </div>
-                
-                <div class="form-item">
-                    <label>优先级颜色</label>
-                    <select name="priority_color">
-                        {% set selected_priority = form_data.get('priority_color', order.priority_color) if form_data is defined else order.priority_color %}
-                        <option value="红色" {% if selected_priority == "红色" %}selected{% endif %}>红色（最高）</option>
-                        <option value="橙色" {% if selected_priority == "橙色" %}selected{% endif %}>橙色</option>
-                        <option value="黄色" {% if selected_priority == "黄色" %}selected{% endif %}>黄色</option>
-                        <option value="蓝色" {% if selected_priority == "蓝色" %}selected{% endif %}>蓝色</option>
-                        <option value="灰色" {% if selected_priority == "灰色" %}selected{% endif %}>灰色（默认）</option>
-                    </select>
-                </div>
-
-                <div class="form-item">
-                    <label>截至日期</label>
-                    <input type="date" name="due_date" value="{{ form_data.get('due_date', order.due_date) if form_data is defined else order.due_date }}">
-                    <small class="help-text">越接近截止日期，工作台中越靠前</small>
-                </div>
-
-                <div class="form-item">
-                    <label>备注</label>
-                    <textarea name="remark" rows="4">{{ form_data.get('remark', order.remark) if form_data is defined else order.remark }}</textarea>
-                </div>
-
-                <div class="form-actions">
-                    <button class="btn-primary" type="submit" onclick="return confirm('确认保存本次修改？');">保存修改</button>
-                    <a class="btn-secondary" href="/orders/{{ order.id }}">返回详情</a>
-                </div>
-            </form>
+        <div class="form-item form-item-small">
+            <label>联系电话</label>
+            <input type="text" name="phone" id="phone-input" value="{{ form_data.get('phone', order.phone) if form_data is defined else order.phone }}" inputmode="tel" autocomplete="tel">
         </div>
-    </main>
-</div>
 
-<script>
-async function bindSuggest(inputId, boxId, fieldName) {
-    const input = document.getElementById(inputId);
-    const box = document.getElementById(boxId);
+        <div class="form-item">
+            <label>商品名称 <span class="required-star">*</span></label>
+            <div class="suggest-wrap">
+                <input type="text" name="item_name" id="item-input" value="{{ form_data.get('item_name', order.item_name) if form_data is defined else order.item_name }}" autocomplete="off" required>
+                <div class="suggest-box" id="item-suggest"></div>
+            </div>
+        </div>
 
-    async function fetchSuggestions() {
-        const q = input.value.trim();
-        if (!q) {
-            box.innerHTML = "";
-            box.style.display = "none";
-            return;
-        }
+        <div class="form-item">
+            <label>尺寸</label>
+            <div class="suggest-wrap">
+                <input type="text" name="size" id="size-input" value="{{ form_data.get('size', order.size) if form_data is defined else order.size }}" autocomplete="off">
+                <div class="suggest-box" id="size-suggest"></div>
+            </div>
+        </div>
 
-        const resp = await fetch(`/api/suggest?field=${fieldName}&q=${encodeURIComponent(q)}`);
-        const data = await resp.json();
-        const items = data.items || [];
+        <div class="form-item">
+            <label>数量 <span class="required-star">*</span></label>
+            <input type="number" name="quantity" id="quantity-input" min="1" step="1" value="{{ form_data.get('quantity', order.quantity) if form_data is defined else order.quantity }}" required>
+        </div>
 
-        if (!items.length) {
-            box.innerHTML = "";
-            box.style.display = "none";
-            return;
-        }
+        <div class="form-item">
+            <label>单价 <span class="required-star">*</span> <span class="amount-preview" id="amount-preview">合计 0.00</span></label>
+            <input type="number" name="unit_price" id="unit-price-input" step="0.01" min="0" value="{{ form_data.get('unit_price', order.unit_price) if form_data is defined else order.unit_price }}" required>
+        </div>
 
-        box.innerHTML = items.map(item => `<button type="button" class="suggest-item">${item}</button>`).join("");
-        box.style.display = "block";
+        <div class="form-item">
+            <label>已收金额</label>
+            <input type="number" name="paid_amount" id="paid-amount-input" step="0.01" min="0" value="{{ form_data.get('paid_amount', order.paid_amount) if form_data is defined else order.paid_amount }}">
+            <small class="help-text">修改已收金额会重新计算未结清订单的待结金额。</small>
+        </div>
 
-        box.querySelectorAll(".suggest-item").forEach(btn => {
-            btn.addEventListener("click", () => {
-                input.value = btn.textContent;
-                box.innerHTML = "";
-                box.style.display = "none";
-                input.focus();
-            });
-        });
-    }
+        <div class="form-item">
+            <label>优先级颜色</label>
+            <select name="priority_color" id="priority-input">
+                {% set selected_priority = form_data.get('priority_color', order.priority_color) if form_data is defined else order.priority_color %}
+                <option value="红色" {% if selected_priority == "红色" %}selected{% endif %}>红色（最高）</option>
+                <option value="橙色" {% if selected_priority == "橙色" %}selected{% endif %}>橙色</option>
+                <option value="黄色" {% if selected_priority == "黄色" %}selected{% endif %}>黄色</option>
+                <option value="蓝色" {% if selected_priority == "蓝色" %}selected{% endif %}>蓝色</option>
+                <option value="灰色" {% if selected_priority == "灰色" %}selected{% endif %}>灰色（默认）</option>
+            </select>
+        </div>
 
-    let timer = null;
-    input.addEventListener("input", () => {
-        clearTimeout(timer);
-        timer = setTimeout(fetchSuggestions, 120);
-    });
+        <div class="form-item">
+            <label>截至日期</label>
+            <input type="date" name="due_date" id="due-date-input" value="{{ form_data.get('due_date', order.due_date) if form_data is defined else order.due_date }}">
+            <small class="help-text">越接近截止日期，工作台中越靠前</small>
+        </div>
 
-    input.addEventListener("blur", () => {
-        setTimeout(() => {
-            box.style.display = "none";
-        }, 150);
-    });
+        <div class="form-item">
+            <label>备注</label>
+            <textarea name="remark" id="remark-input" rows="4">{{ form_data.get('remark', order.remark) if form_data is defined else order.remark }}</textarea>
+        </div>
 
-    input.addEventListener("focus", () => {
-        if (input.value.trim()) {
-            fetchSuggestions();
-        }
-    });
-}
+        <div class="form-actions">
+            <button class="btn-primary" type="submit">保存修改</button>
+            <a class="btn-secondary" href="/orders/{{ order.id }}">返回详情</a>
+        </div>
+    </form>
+</section>
+{% endblock %}
 
-bindSuggest("customer-input", "customer-suggest", "customer");
-bindSuggest("item-input", "item-suggest", "item_name");
-bindSuggest("size-input", "size-suggest", "size");
-</script>
-</body>
-</html>
+{% block page_scripts %}
+<script src="/static/js/order_form.js" defer></script>
+{% endblock %}

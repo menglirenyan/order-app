@@ -1,0 +1,31 @@
+.shell-layout {
+  background: transparent;
+}
+
+.app-main {
+  min-width: 0;
+}
+
+.page-kicker {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #e6f0fb;
+  color: var(--color-primary-strong);
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.page-header-stack {
+  display: grid;
+  gap: 4px;
+}
+
+@media (max-width: 768px) {
+  .app-main {
+    padding-bottom: 92px;
+  }
+}

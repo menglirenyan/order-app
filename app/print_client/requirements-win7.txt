@@ -1,2 +1,0 @@
-pyinstaller==4.10
-pywin32==306

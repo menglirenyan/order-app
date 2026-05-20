@@ -15,7 +15,6 @@
             <a class="nav-link" href="/dashboard">工作台</a>
             <a class="nav-link" href="/orders">订单列表</a>
             <a class="nav-link" href="/orders/new">新建订单</a>
-            <a class="nav-link" href="/print-jobs">打印队列</a>
             <a class="nav-link active" href="/print-settings">打印设置</a>
             <a class="nav-link" href="/showcase">货物展示</a>
             <a class="nav-link" href="/showcase/manage">展示管理</a>
@@ -30,74 +29,54 @@
         <div class="page-header">
             <div>
                 <h1>打印设置</h1>
-                <p>先设置默认模板，再为特殊客户添加专属模板；打印时默认按规则自动选择。</p>
+                <p>设置 A4 三联出货单的标题、联次、底部说明和签字栏。</p>
             </div>
             <div class="page-actions">
-                <a class="btn-secondary" href="/print-jobs">返回打印队列</a>
+                <a class="btn-secondary" href="/orders">返回订单列表</a>
             </div>
         </div>
         {% include "_flash.html" %}
 
-        <div class="settings-grid">
-            <section class="card">
-                <h2 class="section-title">全局默认模板</h2>
-                <form action="/print-settings/default" method="post" class="settings-form">
-                    <label>
-                        <span>默认打印模板</span>
-                        <select name="default_print_template">
-                            {% for key, item in print_templates.items() %}
-                            <option value="{{ key }}" {% if default_print_template == key %}selected{% endif %}>{{ item.label }} · {{ item.description }}</option>
-                            {% endfor %}
-                        </select>
-                    </label>
-                    <button class="btn-primary" type="submit">保存默认模板</button>
-                </form>
-            </section>
-
-            <section class="card">
-                <h2 class="section-title">客户专属模板</h2>
-                <form action="/print-settings/rules" method="post" class="settings-form">
-                    <label>
-                        <span>客户名称</span>
-                        <input type="text" name="customer_name" list="customer-options" placeholder="输入或选择客户" required>
-                        <datalist id="customer-options">
-                            {% for customer in customers %}
-                            <option value="{{ customer }}"></option>
-                            {% endfor %}
-                        </datalist>
-                    </label>
-                    <label>
-                        <span>专属模板</span>
-                        <select name="print_template">
-                            {% for key, item in print_templates.items() %}
-                            <option value="{{ key }}">{{ item.label }}</option>
-                            {% endfor %}
-                        </select>
-                    </label>
-                    <button class="btn-primary" type="submit">保存客户规则</button>
-                </form>
-            </section>
-        </div>
-
         <section class="card">
-            <h2 class="section-title">当前客户规则</h2>
-            {% if rules %}
-            <div class="settings-rule-list">
-                {% for rule in rules %}
-                <div class="settings-rule-item">
-                    <div>
-                        <strong>{{ rule.customer_name }}</strong>
-                        <span>{{ print_template_label(rule.print_template) }}</span>
-                    </div>
-                    <form action="/print-settings/rules/{{ rule.id }}/delete" method="post" onsubmit="return confirm('确认删除这个客户模板规则？');">
-                        <button class="btn-secondary" type="submit">删除</button>
-                    </form>
+            <h2 class="section-title">A4 三联出货单文案</h2>
+            <form action="/print-settings/delivery-config" method="post" class="settings-form delivery-config-form">
+                <label>
+                    <span>标题</span>
+                    <input type="text" name="title" value="{{ print_config.title }}" required>
+                </label>
+
+                <label>
+                    <span>三联名称（一行一个，保存时取前三个）</span>
+                    <textarea name="copies_text" rows="3" required>{{ copies_text }}</textarea>
+                </label>
+
+                <label>
+                    <span>默认单位</span>
+                    <input type="text" name="unit" value="{{ print_config.unit }}" required>
+                </label>
+
+                <label>
+                    <span>底部说明（一行一条）</span>
+                    <textarea name="footer_lines_text" rows="6" required>{{ footer_lines_text }}</textarea>
+                </label>
+
+                <div class="settings-grid compact-settings-grid">
+                    <label>
+                        <span>送货人标签</span>
+                        <input type="text" name="delivery_person_label" value="{{ print_config.delivery_person_label }}" required>
+                    </label>
+                    <label>
+                        <span>送货人默认值</span>
+                        <input type="text" name="delivery_person_value" value="{{ print_config.delivery_person_value }}">
+                    </label>
+                    <label>
+                        <span>收货签字标签</span>
+                        <input type="text" name="receiver_sign_label" value="{{ print_config.receiver_sign_label }}" required>
+                    </label>
                 </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <div class="empty-box">还没有客户专属模板规则。所有订单会使用全局默认模板。</div>
-            {% endif %}
+
+                <button class="btn-primary" type="submit">保存打印文案</button>
+            </form>
         </section>
     </main>
 </div>

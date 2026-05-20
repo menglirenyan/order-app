@@ -1,0 +1,7 @@
+{% macro status_badge(kind, value) -%}
+<span class="status-badge status-{{ kind }}-{{ value }}">{{ value }}</span>
+{%- endmacro %}
+
+{% macro priority_badge(value) -%}
+<span class="priority-badge priority-{{ value }}">{{ value }}</span>
+{%- endmacro %}

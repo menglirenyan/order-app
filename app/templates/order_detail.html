@@ -1,106 +1,110 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>订单详情</title>
-    <link rel="stylesheet" href="/static/app.css">
-    <script src="/static/mobile_ui.js" defer></script>
-</head>
-<body>
-<div class="layout">
-    <aside class="sidebar">
-        <h2>方圆订单系统</h2>
-        <nav>
-            <a class="nav-link" href="/dashboard">工作台</a>
-            <a class="nav-link" href="/orders">订单列表</a>
-            <a class="nav-link" href="/orders/new">新建订单</a>
-            <a class="nav-link" href="/print-jobs">打印队列</a>
-            <a class="nav-link" href="/showcase">货物展示</a>
-            <a class="nav-link" href="/showcase/manage">展示管理</a>
-            {% if current_user.is_admin %}
-            <a class="nav-link" href="/users">用户管理</a>
-            {% endif %}
-            <a class="nav-link" href="/logout">退出登录</a>
-        </nav>
-    </aside>
+{% extends "layouts/admin.html" %}
+{% from "components/status_badge.html" import status_badge, priority_badge %}
 
-    <main class="content">
-        <div class="page-header">
-            <div>
-                <h1>订单详情</h1>
-                <p>订单号：{{ order.order_no }}</p>
-            </div>
-            <div>
-                <a class="btn-secondary" href="/orders">返回列表</a>
-                <a class="btn-secondary" href="/orders/{{ order.id }}/edit">编辑订单</a>
-            </div>
-        </div>
-        {% include "_flash.html" %}
+{% block title %}订单详情{% endblock %}
 
-        <div class="card detail-grid">
-            <div><strong>客户：</strong>{{ order.customer }}</div>
-            <div><strong>电话：</strong>{{ order.phone }}</div>
-            <div><strong>商品：</strong>{{ order.item_name }}</div>
-            <div><strong>尺寸：</strong>{{ order.size }}</div>
-            <div><strong>数量：</strong>{{ order.quantity }}</div>
-            <div><strong>单价：</strong>{{ order.unit_price }}</div>
-            <div><strong>总金额：</strong>{{ order.total_amount }}</div>
-            <div><strong>已收金额：</strong>{{ order.paid_amount }}</div>
-            <div><strong>待结金额：</strong>{{ order.unpaid_amount }}</div>
-            <div><strong>付款状态：</strong><span class="status-badge status-payment-{{ order.payment_status }}">{{ order.payment_status }}</span></div>
-            <div><strong>打印状态：</strong><span class="status-badge status-print-{{ order.print_status }}">{{ order.print_status }}</span></div>
-            <div class="full-row"><strong>备注：</strong>{{ order.remark }}</div>
-        </div>
+{% block page_header %}
+<div class="page-header">
+    <div class="page-header-stack">
+        <span class="page-kicker">订单详情</span>
+        <h1>{{ order.customer }} - {{ order.item_name }}</h1>
+        <p>订单号：{{ order.order_no }}</p>
+    </div>
+    <div class="page-actions mobile-compact-actions">
+        <a class="btn-secondary" href="/orders">返回列表</a>
+        <a class="btn-secondary" href="/orders/{{ order.id }}/edit">编辑订单</a>
+    </div>
+</div>
+{% endblock %}
 
-        <div class="card action-row">
-    {% if order.print_status == "未打印" %}
-    <form action="/orders/{{ order.id }}/print" method="post" onsubmit="return confirm('确认发送到打印队列？Win7 客户端打印成功后才会标记为已打印。');">
-        <select name="print_template" class="compact-select" aria-label="打印模板">
-            <option value="auto" selected>按设置自动选择</option>
-            {% for key, item in print_templates.items() %}
-            <option value="{{ key }}">{{ item.label }}</option>
-            {% endfor %}
-        </select>
-        <button class="btn-primary" type="submit">发送到打印队列</button>
+{% block content %}
+<section class="card">
+    <div class="workflow-rail" aria-label="订单流程">
+        <div class="workflow-step active">1. 已下单</div>
+        <div class="workflow-step {% if order.production_status in ['已投产', '已完成'] %}active{% endif %}">2. 已投产</div>
+        <div class="workflow-step {% if order.production_status == '已完成' %}active{% endif %}">3. 已完成</div>
+        <div class="workflow-step {% if order.payment_status == '已付款' %}active{% endif %}">4. 已结清</div>
+        <div class="workflow-step {% if order.print_status == '已打印' %}active{% endif %}">5. 已打印</div>
+    </div>
+    <div class="mobile-order-statuses">
+        {{ priority_badge(order.priority_color) }}
+        {{ status_badge("payment", order.payment_status) }}
+        {{ status_badge("production", order.production_status) }}
+        {{ status_badge("print", order.print_status) }}
+    </div>
+</section>
+
+<section class="card detail-grid">
+    <div><strong>客户：</strong>{{ order.customer }}</div>
+    <div><strong>电话：</strong>{{ order.phone or "-" }}</div>
+    <div><strong>商品：</strong>{{ order.item_name }}</div>
+    <div><strong>尺寸：</strong>{{ order.size or "-" }}</div>
+    <div><strong>数量：</strong>{{ order.quantity }}</div>
+    <div><strong>单价：</strong>{{ format_money(order.unit_price) }}</div>
+    <div><strong>总金额：</strong>{{ format_money(order.total_amount) }}</div>
+    <div><strong>已收金额：</strong>{{ format_money(order.paid_amount) }}</div>
+    <div><strong>待结金额：</strong>{{ format_money(order.unpaid_amount) }}</div>
+    <div><strong>截至日期：</strong>{{ order.due_date or "未设置" }}</div>
+    <div><strong>付款状态：</strong>{{ status_badge("payment", order.payment_status) }}</div>
+    <div><strong>生产状态：</strong>{{ status_badge("production", order.production_status) }}</div>
+    <div><strong>打印状态：</strong>{{ status_badge("print", order.print_status) }}</div>
+    <div><strong>优先级：</strong>{{ priority_badge(order.priority_color) }}</div>
+    <div class="full-row"><strong>备注：</strong>{{ order.remark or "无" }}</div>
+</section>
+
+<section class="card action-row">
+    {% if order.production_status == "未投产" %}
+    <form action="/orders/{{ order.id }}/production" method="post" data-confirm="确认把该订单标记为已投产？">
+        <input type="hidden" name="return_to" value="/orders/{{ order.id }}">
+        <button class="btn-primary" type="submit">标记投产</button>
     </form>
-    <a class="btn-secondary" href="/orders/{{ order.id }}/print-preview">打印预览</a>
+    {% elif order.production_status == "已投产" %}
+    <form action="/orders/{{ order.id }}/complete" method="post" data-confirm="确认该订单生产已完成？">
+        <input type="hidden" name="return_to" value="/orders/{{ order.id }}">
+        <button class="btn-primary" type="submit">标记完成</button>
+    </form>
+    {% endif %}
+
+    {% if order.print_status == "未打印" %}
+    <form action="/orders/{{ order.id }}/print" method="post" data-confirm="确认打印出货单？点击后订单会标记为已打印。">
+        <input type="hidden" name="return_to" value="/orders/{{ order.id }}">
+        <button class="btn-primary" type="submit">打印出货单</button>
+    </form>
     {% endif %}
 
     {% if order.payment_status == "未付款" %}
-    <form action="/orders/{{ order.id }}/paid" method="post" onsubmit="return confirm('确认该订单已一次性结清？');">
-        <button class="btn-primary" type="submit">标记已结清</button>
+    <form action="/orders/{{ order.id }}/paid" method="post" data-confirm="确认该订单已一次性结清？">
+        <input type="hidden" name="return_to" value="/orders/{{ order.id }}">
+        <button class="btn-secondary" type="submit">标记已结清</button>
     </form>
     {% else %}
-    <form action="/orders/{{ order.id }}/unpaid" method="post" onsubmit="return confirm('确认改回未付款？');">
+    <form action="/orders/{{ order.id }}/unpaid" method="post" data-confirm="确认改回未付款？">
+        <input type="hidden" name="return_to" value="/orders/{{ order.id }}">
         <button class="btn-secondary" type="submit">改回未付款</button>
     </form>
     {% endif %}
 
-    <form action="/orders/{{ order.id }}/undo" method="post" onsubmit="return confirm('确认撤回最近一次状态操作？');">
+    <form action="/orders/{{ order.id }}/undo" method="post" data-confirm="确认撤回最近一次状态操作？">
         <button class="btn-secondary" type="submit">撤回上一步</button>
     </form>
 
-    <form action="/orders/{{ order.id }}/delete" method="post" onsubmit="return confirm('删除订单是重要操作，确认继续？');">
+    <form action="/orders/{{ order.id }}/delete" method="post" data-confirm="删除订单是重要操作，确认继续？">
         <button class="btn-danger" type="submit">删除订单</button>
     </form>
-</div>
+</section>
 
-        {% if logs %}
-        <div class="card">
-            <h2 class="section-title">最近操作</h2>
-            <div class="log-list">
-                {% for log in logs %}
-                <div class="log-item">
-                    <span class="log-time">{{ log.created_at.strftime("%m-%d %H:%M") if log.created_at else "-" }}</span>
-                    <strong>{{ action_label(log.action) }}</strong>
-                    <span class="log-operator">{{ log.operator or "系统" }}</span>
-                </div>
-                {% endfor %}
-            </div>
+{% if logs %}
+<section class="card">
+    <h2 class="section-title">最近操作</h2>
+    <div class="log-list">
+        {% for log in logs %}
+        <div class="log-item">
+            <span class="log-time">{{ log.created_at.strftime("%m-%d %H:%M") if log.created_at else "-" }}</span>
+            <strong>{{ action_label(log.action) }}</strong>
+            <span class="log-operator">{{ log.operator or "系统" }}</span>
         </div>
-        {% endif %}
-    </main>
-</div>
-</body>
-</html>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+{% endblock %}

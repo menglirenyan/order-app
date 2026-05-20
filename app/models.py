@@ -43,37 +43,12 @@ class Order(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
-class PrintJob(Base):
-    __tablename__ = "print_jobs"
-
-    id = Column(Integer, primary_key=True, index=True)
-    order_id = Column(Integer, index=True, nullable=False)
-    print_template = Column(String, default="delivery")
-    status = Column(String, default="pending", index=True)  # pending / printing / done / failed
-    client_id = Column(String, default="")
-    attempts = Column(Integer, default=0)
-    error_message = Column(Text, default="")
-    created_at = Column(DateTime, default=datetime.utcnow)
-    claimed_at = Column(DateTime, nullable=True)
-    printed_at = Column(DateTime, nullable=True)
-
-
 class AppSetting(Base):
     __tablename__ = "app_settings"
 
     id = Column(Integer, primary_key=True, index=True)
     key = Column(String, unique=True, index=True, nullable=False)
     value = Column(Text, default="")
-    updated_at = Column(DateTime, default=datetime.utcnow)
-
-
-class PrintTemplateRule(Base):
-    __tablename__ = "print_template_rules"
-
-    id = Column(Integer, primary_key=True, index=True)
-    customer_name = Column(String, unique=True, index=True, nullable=False)
-    print_template = Column(String, default="delivery")
-    created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
 
 

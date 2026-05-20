@@ -1,0 +1,139 @@
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(120px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.metric-card {
+  display: block;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 5px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  box-shadow: var(--shadow-card);
+  text-decoration: none;
+}
+
+.metric-card strong {
+  display: block;
+  font-size: 26px;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.metric-card span {
+  color: var(--color-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.metric-danger {
+  border-left-color: var(--color-danger);
+}
+
+.metric-warning {
+  border-left-color: var(--color-warning);
+}
+
+.metric-success {
+  border-left-color: var(--color-success);
+}
+
+.workflow-rail {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.workflow-step {
+  min-height: 44px;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-muted);
+  color: var(--color-muted);
+  text-align: center;
+  font-weight: 700;
+}
+
+.workflow-step.active {
+  background: #e6f0fb;
+  color: var(--color-primary-strong);
+  border-color: #9cc8f3;
+}
+
+.confirm-dialog[hidden] {
+  display: none;
+}
+
+.confirm-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+}
+
+.confirm-dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.confirm-dialog-panel {
+  position: relative;
+  width: min(420px, 100%);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  box-shadow: var(--shadow-dialog);
+}
+
+.confirm-dialog-panel h2 {
+  margin: 0 0 8px;
+  font-size: 22px;
+}
+
+.confirm-dialog-panel p {
+  margin: 0;
+  color: var(--color-muted);
+  line-height: 1.55;
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.empty-state strong {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--color-text);
+}
+
+.empty-state p {
+  margin: 0;
+}
+
+@media (max-width: 1024px) {
+  .metric-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workflow-rail {
+    grid-template-columns: 1fr;
+  }
+}
