@@ -46,13 +46,12 @@ async function bindSuggest(inputId, boxId, fieldName) {
 const fieldMap = {
   customer: "customer-input",
   phone: "phone-input",
+  order_type: "order-type-input",
   item_name: "item-input",
   size: "size-input",
   quantity: "quantity-input",
   unit_price: "unit-price-input",
   paid_amount: "paid-amount-input",
-  priority_color: "priority-input",
-  due_date: "due-date-input",
   remark: "remark-input",
 };
 

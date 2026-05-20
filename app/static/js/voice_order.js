@@ -24,7 +24,8 @@ function renderDraftCards(orders, topIssues, forceReview = false) {
         </div>
         <div class="draft-fields">
           <span class="${draft.customer ? "" : "missing"}">客户：${formatValue(draft.customer)}</span>
-          <span class="${draft.item_name ? "" : "missing"}">商品：${formatValue(draft.item_name)}</span>
+          <span>类型：${formatValue(draft.order_type || "瓦楞板")}</span>
+          <span class="${draft.item_name ? "" : "missing"}">内容：${formatValue(draft.item_name)}</span>
           <span>尺寸：${formatValue(draft.size)}</span>
           <span class="${draft.quantity > 0 ? "" : "missing"}">数量：${formatValue(draft.quantity)}</span>
           <span class="${draft.unit_price > 0 ? "" : "missing"}">单价：${formatValue(draft.unit_price)}</span>

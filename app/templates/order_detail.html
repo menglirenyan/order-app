@@ -1,5 +1,5 @@
 {% extends "layouts/admin.html" %}
-{% from "components/status_badge.html" import status_badge, priority_badge %}
+{% from "components/status_badge.html" import status_badge %}
 
 {% block title %}订单详情{% endblock %}
 
@@ -18,18 +18,17 @@
 {% endblock %}
 
 {% block content %}
-<section class="card">
-    <div class="workflow-rail" aria-label="订单流程">
-        <div class="workflow-step active">1. 已下单</div>
-        <div class="workflow-step {% if order.production_status in ['已投产', '已完成'] %}active{% endif %}">2. 已投产</div>
-        <div class="workflow-step {% if order.production_status == '已完成' %}active{% endif %}">3. 已完成</div>
-        <div class="workflow-step {% if order.payment_status == '已付款' %}active{% endif %}">4. 已结清</div>
-        <div class="workflow-step {% if order.print_status == '已打印' %}active{% endif %}">5. 已打印</div>
+<section class="card ledger-hero {% if order.delivery_status == '已拉走' and order.payment_status == '未结清' %}risk-card{% endif %}">
+    <div>
+        <div class="summary-label">当前欠款</div>
+        <div class="ledger-debt">{{ format_money(order.unpaid_amount) }}</div>
+        {% if order.delivery_status == '已拉走' and order.payment_status == '未结清' %}
+        <p class="risk-text">注意：货已经拉走，但尾款还没结清。</p>
+        {% endif %}
     </div>
     <div class="mobile-order-statuses">
-        {{ priority_badge(order.priority_color) }}
+        {{ status_badge("delivery", order.delivery_status) }}
         {{ status_badge("payment", order.payment_status) }}
-        {{ status_badge("production", order.production_status) }}
         {{ status_badge("print", order.print_status) }}
     </div>
 </section>
@@ -37,50 +36,38 @@
 <section class="card detail-grid">
     <div><strong>客户：</strong>{{ order.customer }}</div>
     <div><strong>电话：</strong>{{ order.phone or "-" }}</div>
-    <div><strong>商品：</strong>{{ order.item_name }}</div>
-    <div><strong>尺寸：</strong>{{ order.size or "-" }}</div>
+    <div><strong>类型：</strong>{{ order.order_type }}</div>
+    <div><strong>内容：</strong>{{ order.item_name }}</div>
+    <div><strong>尺寸/规格：</strong>{{ order.size or "-" }}</div>
     <div><strong>数量：</strong>{{ order.quantity }}</div>
     <div><strong>单价：</strong>{{ format_money(order.unit_price) }}</div>
     <div><strong>总金额：</strong>{{ format_money(order.total_amount) }}</div>
     <div><strong>已收金额：</strong>{{ format_money(order.paid_amount) }}</div>
-    <div><strong>待结金额：</strong>{{ format_money(order.unpaid_amount) }}</div>
-    <div><strong>截至日期：</strong>{{ order.due_date or "未设置" }}</div>
-    <div><strong>付款状态：</strong>{{ status_badge("payment", order.payment_status) }}</div>
-    <div><strong>生产状态：</strong>{{ status_badge("production", order.production_status) }}</div>
+    <div><strong>欠款：</strong><span class="money-danger">{{ format_money(order.unpaid_amount) }}</span></div>
+    <div><strong>拉走状态：</strong>{{ status_badge("delivery", order.delivery_status) }}</div>
+    <div><strong>结清状态：</strong>{{ status_badge("payment", order.payment_status) }}</div>
     <div><strong>打印状态：</strong>{{ status_badge("print", order.print_status) }}</div>
-    <div><strong>优先级：</strong>{{ priority_badge(order.priority_color) }}</div>
+    <div><strong>拉走时间：</strong>{{ order.delivered_at.strftime("%Y-%m-%d %H:%M") if order.delivered_at else "未拉走" }}</div>
     <div class="full-row"><strong>备注：</strong>{{ order.remark or "无" }}</div>
 </section>
 
 <section class="card action-row">
-    {% if order.production_status == "未投产" %}
-    <form action="/orders/{{ order.id }}/production" method="post" data-confirm="确认把该订单标记为已投产？">
-        <input type="hidden" name="return_to" value="/orders/{{ order.id }}">
-        <button class="btn-primary" type="submit">标记投产</button>
-    </form>
-    {% elif order.production_status == "已投产" %}
-    <form action="/orders/{{ order.id }}/complete" method="post" data-confirm="确认该订单生产已完成？">
-        <input type="hidden" name="return_to" value="/orders/{{ order.id }}">
-        <button class="btn-primary" type="submit">标记完成</button>
-    </form>
-    {% endif %}
-
-    {% if order.print_status == "未打印" %}
-    <form action="/orders/{{ order.id }}/print" method="post" data-confirm="确认打印出货单？点击后订单会标记为已打印。">
+    {% if order.print_status != "已打印" or order.delivery_status != "已拉走" %}
+    <form action="/orders/{{ order.id }}/print" method="post" data-confirm="确认打印出货单？打印后会标记为已拉走。">
         <input type="hidden" name="return_to" value="/orders/{{ order.id }}">
         <button class="btn-primary" type="submit">打印出货单</button>
     </form>
     {% endif %}
 
-    {% if order.payment_status == "未付款" %}
-    <form action="/orders/{{ order.id }}/paid" method="post" data-confirm="确认该订单已一次性结清？">
+    {% if order.payment_status == "未结清" %}
+    <form action="/orders/{{ order.id }}/paid" method="post" data-confirm="确认该订单已结清？">
         <input type="hidden" name="return_to" value="/orders/{{ order.id }}">
-        <button class="btn-secondary" type="submit">标记已结清</button>
+        <button class="btn-primary" type="submit">标记结清</button>
     </form>
     {% else %}
-    <form action="/orders/{{ order.id }}/unpaid" method="post" data-confirm="确认改回未付款？">
+    <form action="/orders/{{ order.id }}/unpaid" method="post" data-confirm="确认改回未结清？">
         <input type="hidden" name="return_to" value="/orders/{{ order.id }}">
-        <button class="btn-secondary" type="submit">改回未付款</button>
+        <button class="btn-secondary" type="submit">改回未结清</button>
     </form>
     {% endif %}
 

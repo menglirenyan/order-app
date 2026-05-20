@@ -22,6 +22,7 @@ class Order(Base):
 
     customer = Column(String, index=True, nullable=False)
     phone = Column(String, default="")
+    order_type = Column(String, default="瓦楞板", index=True)
     item_name = Column(String, index=True, nullable=False)
     size = Column(String, default="")
 
@@ -32,9 +33,10 @@ class Order(Base):
     paid_amount = Column(Float, default=0.0)
     unpaid_amount = Column(Float, default=0.0)
 
-    payment_status = Column(String, default="未付款")
-    production_status = Column(String, default="未投产")
+    payment_status = Column(String, default="未结清")
     print_status = Column(String, default="未打印")
+    delivery_status = Column(String, default="未拉走", index=True)
+    delivered_at = Column(DateTime, nullable=True)
 
     priority_color = Column(String, default="灰色")   # 红色 / 橙色 / 黄色 / 蓝色 / 灰色
     due_date = Column(Date, nullable=True)
@@ -72,8 +74,8 @@ class OperationLog(Base):
     id = Column(Integer, primary_key=True, index=True)
     target_type = Column(String, nullable=False)       # order / user / showcase
     target_id = Column(Integer, nullable=False)
-    action = Column(String, nullable=False)            # mark_printed / mark_production / mark_complete / edit_order / delete_order ...
-    field_name = Column(String, default="")            # print_status / production_status ...
+    action = Column(String, nullable=False)            # mark_printed / mark_paid / edit_order / delete_order ...
+    field_name = Column(String, default="")            # print_status / payment_status ...
     old_value = Column(Text, default="")
     new_value = Column(Text, default="")
     operator = Column(String, default="")

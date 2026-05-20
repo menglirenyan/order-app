@@ -5,7 +5,7 @@
 {% block page_header %}
 <div class="page-header">
     <div class="page-header-stack">
-        <span class="page-kicker">编辑订单</span>
+        <span class="page-kicker">修改账本</span>
         <h1>编辑订单</h1>
         <p>订单号：{{ order.order_no }}</p>
     </div>
@@ -16,7 +16,7 @@
 {% endblock %}
 
 {% block content %}
-<section class="card mobile-form-card">
+<section class="card mobile-form-card ledger-form-card">
     {% if errors %}
     <ul class="form-error-list">
         {% for error in errors %}
@@ -39,7 +39,17 @@
         </div>
 
         <div class="form-item">
-            <label>商品名称 <span class="required-star">*</span></label>
+            <label>订单类型 <span class="required-star">*</span></label>
+            {% set selected_order_type = form_data.get('order_type', order.order_type) if form_data is defined else order.order_type %}
+            <select name="order_type" id="order-type-input" required>
+                {% for option in order_types %}
+                <option value="{{ option }}" {% if selected_order_type == option %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-item">
+            <label>货物内容 <span class="required-star">*</span></label>
             <div class="suggest-wrap">
                 <input type="text" name="item_name" id="item-input" value="{{ form_data.get('item_name', order.item_name) if form_data is defined else order.item_name }}" autocomplete="off" required>
                 <div class="suggest-box" id="item-suggest"></div>
@@ -47,7 +57,7 @@
         </div>
 
         <div class="form-item">
-            <label>尺寸</label>
+            <label>尺寸/规格</label>
             <div class="suggest-wrap">
                 <input type="text" name="size" id="size-input" value="{{ form_data.get('size', order.size) if form_data is defined else order.size }}" autocomplete="off">
                 <div class="suggest-box" id="size-suggest"></div>
@@ -67,25 +77,7 @@
         <div class="form-item">
             <label>已收金额</label>
             <input type="number" name="paid_amount" id="paid-amount-input" step="0.01" min="0" value="{{ form_data.get('paid_amount', order.paid_amount) if form_data is defined else order.paid_amount }}">
-            <small class="help-text">修改已收金额会重新计算未结清订单的待结金额。</small>
-        </div>
-
-        <div class="form-item">
-            <label>优先级颜色</label>
-            <select name="priority_color" id="priority-input">
-                {% set selected_priority = form_data.get('priority_color', order.priority_color) if form_data is defined else order.priority_color %}
-                <option value="红色" {% if selected_priority == "红色" %}selected{% endif %}>红色（最高）</option>
-                <option value="橙色" {% if selected_priority == "橙色" %}selected{% endif %}>橙色</option>
-                <option value="黄色" {% if selected_priority == "黄色" %}selected{% endif %}>黄色</option>
-                <option value="蓝色" {% if selected_priority == "蓝色" %}selected{% endif %}>蓝色</option>
-                <option value="灰色" {% if selected_priority == "灰色" %}selected{% endif %}>灰色（默认）</option>
-            </select>
-        </div>
-
-        <div class="form-item">
-            <label>截至日期</label>
-            <input type="date" name="due_date" id="due-date-input" value="{{ form_data.get('due_date', order.due_date) if form_data is defined else order.due_date }}">
-            <small class="help-text">越接近截止日期，工作台中越靠前</small>
+            <small class="help-text">修改后会自动重新计算欠款。</small>
         </div>
 
         <div class="form-item">

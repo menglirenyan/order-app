@@ -1,151 +1,113 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#2563eb">
-    <title>新建订单</title>
-    <link rel="manifest" href="/static/manifest.webmanifest">
-    <link rel="stylesheet" href="/static/app.css">
-    <script src="/static/mobile_ui.js" defer></script>
-</head>
-<body>
-<div class="layout">
-    <aside class="sidebar">
-        <h2>方圆订单系统</h2>
-        <nav>
-            <a class="nav-link" href="/dashboard">工作台</a>
-            <a class="nav-link" href="/orders">订单列表</a>
-            <a class="nav-link active" href="/orders/new">新建订单</a>
-            <a class="nav-link" href="/showcase">货物展示</a>
-            <a class="nav-link" href="/showcase/manage">展示管理</a>
-            {% if current_user.is_admin %}
-            <a class="nav-link" href="/print-settings">打印设置</a>
-            <a class="nav-link" href="/users">用户管理</a>
-            {% endif %}
-            <a class="nav-link" href="/logout">退出登录</a>
-        </nav>
-    </aside>
+{% extends "layouts/admin.html" %}
 
-    <main class="content order-entry-page">
-        <div class="page-header">
-            <div>
-                <h1>新建订单</h1>
-                <p>订单号将自动生成：{{ next_order_no }}</p>
-            </div>
-            <div class="page-actions mobile-compact-actions">
-                <button class="btn-secondary" type="button" id="open-voice-modal">语音创建</button>
-                <button class="btn-secondary install-button" type="button" id="install-app-btn" hidden>添加到桌面</button>
-            </div>
-        </div>
-        {% include "_flash.html" %}
+{% block title %}新建订单{% endblock %}
+{% block manifest %}<link rel="manifest" href="/static/manifest.webmanifest">{% endblock %}
 
-        <div class="card mobile-form-card">
-            {% if errors %}
-            <ul class="form-error-list">
-                {% for error in errors %}
-                <li>{{ error }}</li>
-                {% endfor %}
-            </ul>
-            {% endif %}
-            <form action="/orders" method="post" class="mobile-order-form" id="order-form">
-                <div class="form-item">
-                    <label>客户名称 <span class="required-star">*</span></label>
-                    <div class="suggest-wrap">
-                        <input type="text" name="customer" id="customer-input" list="customer-options" autocomplete="off" value="{{ form_data.get('customer', '') }}" required>
-                        <datalist id="customer-options">
-                            {% for customer in customer_options %}
-                            <option value="{{ customer }}"></option>
-                            {% endfor %}
-                        </datalist>
-                        <div class="suggest-box" id="customer-suggest"></div>
-                    </div>
-                </div>
-
-                <div class="form-item form-item-small">
-                    <label>联系电话</label>
-                    <input type="text" name="phone" id="phone-input" inputmode="tel" autocomplete="tel" value="{{ form_data.get('phone', '') }}">
-                </div>
-
-                <div class="form-item">
-                    <label>商品名称 <span class="required-star">*</span></label>
-                    <div class="suggest-wrap">
-                        <input type="text" name="item_name" id="item-input" list="item-options" autocomplete="off" value="{{ form_data.get('item_name', '') }}" required>
-                        <datalist id="item-options">
-                            {% for item in item_options %}
-                            <option value="{{ item }}"></option>
-                            {% endfor %}
-                        </datalist>
-                        <div class="suggest-box" id="item-suggest"></div>
-                    </div>
-                </div>
-
-                <div class="form-item">
-                    <label>尺寸</label>
-                    <div class="suggest-wrap">
-                        <input type="text" name="size" id="size-input" list="size-options" autocomplete="off" value="{{ form_data.get('size', '') }}">
-                        <datalist id="size-options">
-                            {% for size in size_options %}
-                            <option value="{{ size }}"></option>
-                            {% endfor %}
-                        </datalist>
-                        <div class="suggest-box" id="size-suggest"></div>
-                    </div>
-                </div>
-
-                <div class="form-item">
-                    <label>数量 <span class="required-star">*</span></label>
-                    <input type="number" name="quantity" id="quantity-input" min="1" step="1" value="{{ form_data.get('quantity', 1) }}" required>
-                </div>
-
-                <div class="form-item">
-                    <label>单价 <span class="required-star">*</span> <span class="amount-preview" id="amount-preview">合计 0.00</span></label>
-                    <input type="number" name="unit_price" id="unit-price-input" step="0.01" min="0" value="{{ form_data.get('unit_price', '') }}" required>
-                </div>
-
-                <div class="form-item">
-                    <label>已收金额</label>
-                    <input type="number" name="paid_amount" id="paid-amount-input" step="0.01" min="0" value="{{ form_data.get('paid_amount', 0) }}">
-                    <small class="help-text">默认 0；有定金或已收款时填写，系统会自动计算待结金额。</small>
-                </div>
-
-                <div class="form-item">
-                    <label>优先级颜色</label>
-                    <select name="priority_color" id="priority-input">
-                        {% set selected_priority = form_data.get('priority_color', '灰色') %}
-                        <option value="红色" {% if selected_priority == "红色" %}selected{% endif %}>红色（最高）</option>
-                        <option value="橙色" {% if selected_priority == "橙色" %}selected{% endif %}>橙色</option>
-                        <option value="黄色" {% if selected_priority == "黄色" %}selected{% endif %}>黄色</option>
-                        <option value="蓝色" {% if selected_priority == "蓝色" %}selected{% endif %}>蓝色</option>
-                        <option value="灰色" {% if selected_priority == "灰色" %}selected{% endif %}>灰色（默认）</option>
-                    </select>
-                </div>
-
-                <div class="form-item">
-                    <label>截至日期</label>
-                    <input type="date" name="due_date" id="due-date-input" value="{{ form_data.get('due_date', '') }}">
-                    <small class="help-text">越接近截止日期，工作台中越靠前</small>
-                </div>
-
-                <div class="form-item">
-                    <label>备注</label>
-                    <textarea name="remark" id="remark-input" rows="4" placeholder="例如：让谁谁做、加急、明早要">{{ form_data.get('remark', '') }}</textarea>
-                </div>
-
-                <div class="form-actions">
-                    <button class="btn-primary" type="submit">提交订单</button>
-                    <a class="btn-secondary" href="/orders">取消</a>
-                </div>
-            </form>
-        </div>
-    </main>
+{% block page_header %}
+<div class="page-header">
+    <div class="page-header-stack">
+        <span class="page-kicker">晚上集中录单</span>
+        <h1>新建订单</h1>
+        <p>订单号自动生成：{{ next_order_no }}。只填账本需要的信息，出货和欠款后面再处理。</p>
+    </div>
+    <div class="page-actions mobile-compact-actions">
+        <button class="btn-secondary" type="button" id="open-voice-modal">语音创建</button>
+        <button class="btn-secondary install-button" type="button" id="install-app-btn" hidden>添加到桌面</button>
+    </div>
 </div>
+{% endblock %}
 
-<nav class="bottom-nav">
-    <a href="/dashboard">工作台</a>
-    <a href="/orders">订单</a>
-    <a class="active" href="/orders/new">新建</a>
-</nav>
+{% block content %}
+<section class="card mobile-form-card ledger-form-card">
+    {% if errors %}
+    <ul class="form-error-list">
+        {% for error in errors %}
+        <li>{{ error }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+    <form action="/orders" method="post" class="mobile-order-form" id="order-form">
+        <div class="form-item">
+            <label>客户名称 <span class="required-star">*</span></label>
+            <div class="suggest-wrap">
+                <input type="text" name="customer" id="customer-input" list="customer-options" autocomplete="off" value="{{ form_data.get('customer', '') }}" required>
+                <datalist id="customer-options">
+                    {% for customer in customer_options %}
+                    <option value="{{ customer }}"></option>
+                    {% endfor %}
+                </datalist>
+                <div class="suggest-box" id="customer-suggest"></div>
+            </div>
+        </div>
+
+        <div class="form-item form-item-small">
+            <label>联系电话</label>
+            <input type="text" name="phone" id="phone-input" inputmode="tel" autocomplete="tel" value="{{ form_data.get('phone', '') }}">
+        </div>
+
+        <div class="form-item">
+            <label>订单类型 <span class="required-star">*</span></label>
+            <select name="order_type" id="order-type-input" required>
+                {% set selected_order_type = form_data.get('order_type', '瓦楞板') %}
+                {% for option in order_types %}
+                <option value="{{ option }}" {% if selected_order_type == option %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-item">
+            <label>货物内容 <span class="required-star">*</span></label>
+            <div class="suggest-wrap">
+                <input type="text" name="item_name" id="item-input" list="item-options" autocomplete="off" value="{{ form_data.get('item_name', '') }}" required>
+                <datalist id="item-options">
+                    {% for item in item_options %}
+                    <option value="{{ item }}"></option>
+                    {% endfor %}
+                </datalist>
+                <div class="suggest-box" id="item-suggest"></div>
+            </div>
+        </div>
+
+        <div class="form-item">
+            <label>尺寸/规格</label>
+            <div class="suggest-wrap">
+                <input type="text" name="size" id="size-input" list="size-options" autocomplete="off" value="{{ form_data.get('size', '') }}">
+                <datalist id="size-options">
+                    {% for size in size_options %}
+                    <option value="{{ size }}"></option>
+                    {% endfor %}
+                </datalist>
+                <div class="suggest-box" id="size-suggest"></div>
+            </div>
+        </div>
+
+        <div class="form-item">
+            <label>数量 <span class="required-star">*</span></label>
+            <input type="number" name="quantity" id="quantity-input" min="1" step="1" value="{{ form_data.get('quantity', 1) }}" required>
+        </div>
+
+        <div class="form-item">
+            <label>单价 <span class="required-star">*</span> <span class="amount-preview" id="amount-preview">合计 0.00</span></label>
+            <input type="number" name="unit_price" id="unit-price-input" step="0.01" min="0" value="{{ form_data.get('unit_price', '') }}" required>
+        </div>
+
+        <div class="form-item">
+            <label>已收金额</label>
+            <input type="number" name="paid_amount" id="paid-amount-input" step="0.01" min="0" value="{{ form_data.get('paid_amount', 0) }}">
+            <small class="help-text">没收钱就填 0；系统自动算欠款。</small>
+        </div>
+
+        <div class="form-item">
+            <label>备注</label>
+            <textarea name="remark" id="remark-input" rows="4" placeholder="例如：从微信复制来的要求、谁来拉货、特殊说明">{{ form_data.get('remark', '') }}</textarea>
+        </div>
+
+        <div class="form-actions">
+            <button class="btn-primary" type="submit">保存订单</button>
+            <a class="btn-secondary" href="/orders">取消</a>
+        </div>
+    </form>
+</section>
 
 <div class="app-modal" id="voiceModal" hidden>
     <div class="app-modal-backdrop" data-close-voice-modal></div>
@@ -153,7 +115,7 @@
         <div class="app-modal-head">
             <div>
                 <h2 id="voiceModalTitle">语音创建订单</h2>
-                <p>说出客户、商品、尺寸、数量、价格、定金和备注。</p>
+                <p>说出客户、类型、内容、尺寸、数量、价格、已收和备注。</p>
             </div>
             <button class="btn-secondary" type="button" data-close-voice-modal>关闭</button>
         </div>
@@ -162,7 +124,7 @@
                 <span class="voice-icon" aria-hidden="true"></span>
             </button>
             <p id="voice-status">点麦克风说订单，识别后会自动填入表单。</p>
-            <textarea id="voice-text" rows="3" placeholder="例如：给张三做亚克力牌 30x40 两个，单价 80，定金 50，明天要，加急"></textarea>
+            <textarea id="voice-text" rows="3" placeholder="例如：张三瓦楞板 30x40 两件，单价 80，已收 50，明天来拉"></textarea>
             <div class="voice-actions">
                 <button class="btn-primary" type="button" id="parse-text-btn">解析文字</button>
                 <button class="btn-secondary" type="button" id="clear-draft-btn">清空语音</button>
@@ -172,269 +134,9 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
-<script>
-async function bindSuggest(inputId, boxId, fieldName) {
-    const input = document.getElementById(inputId);
-    const box = document.getElementById(boxId);
-
-    async function fetchSuggestions() {
-        const q = input.value.trim();
-        const resp = await fetch(`/api/suggest?field=${fieldName}&q=${encodeURIComponent(q)}`);
-        const data = await resp.json();
-        const items = data.items || [];
-
-        if (!items.length) {
-            box.innerHTML = "";
-            box.style.display = "none";
-            return;
-        }
-
-        box.innerHTML = items.map(item => `<button type="button" class="suggest-item">${item}</button>`).join("");
-        box.style.display = "block";
-
-        box.querySelectorAll(".suggest-item").forEach(btn => {
-            btn.addEventListener("click", () => {
-                input.value = btn.textContent;
-                box.innerHTML = "";
-                box.style.display = "none";
-                input.focus();
-            });
-        });
-    }
-
-    let timer = null;
-    input.addEventListener("input", () => {
-        clearTimeout(timer);
-        timer = setTimeout(fetchSuggestions, 120);
-    });
-
-    input.addEventListener("blur", () => {
-        setTimeout(() => {
-            box.style.display = "none";
-        }, 150);
-    });
-
-    input.addEventListener("focus", () => {
-        fetchSuggestions();
-    });
-}
-
-const fieldMap = {
-    customer: "customer-input",
-    phone: "phone-input",
-    item_name: "item-input",
-    size: "size-input",
-    quantity: "quantity-input",
-    unit_price: "unit-price-input",
-    paid_amount: "paid-amount-input",
-    priority_color: "priority-input",
-    due_date: "due-date-input",
-    remark: "remark-input"
-};
-
-function updateAmountPreview() {
-    const quantity = Number(document.getElementById("quantity-input").value || 0);
-    const unitPrice = Number(document.getElementById("unit-price-input").value || 0);
-    document.getElementById("amount-preview").textContent = `合计 ${(quantity * unitPrice).toFixed(2)}`;
-}
-
-function applyDraft(draft) {
-    Object.entries(fieldMap).forEach(([key, id]) => {
-        const el = document.getElementById(id);
-        if (el && draft[key] !== undefined && draft[key] !== null && draft[key] !== "") {
-            el.value = draft[key];
-        }
-    });
-    updateAmountPreview();
-}
-
-function formatValue(value) {
-    if (value === undefined || value === null || value === "") return "未识别";
-    return value;
-}
-
-function renderDraftCards(orders, topIssues, forceReview = false) {
-    const list = document.getElementById("draft-list");
-    if (!orders || (!forceReview && orders.length <= 1)) {
-        list.hidden = true;
-        list.innerHTML = "";
-        return;
-    }
-
-    list.innerHTML = orders.map((entry, index) => {
-        const draft = entry.draft || {};
-        const issues = entry.issues || [];
-        const issueHtml = issues.length ? `<div class="draft-issues">${issues.join("；")}</div>` : "";
-        return `
-            <div class="draft-card">
-                <div class="draft-card-head">
-                    <strong>草稿 ${index + 1}</strong>
-                    <button class="btn-secondary draft-apply-btn" type="button" data-index="${index}">填入这一单</button>
-                </div>
-                <div class="draft-fields">
-                    <span class="${draft.customer ? "" : "missing"}">客户：${formatValue(draft.customer)}</span>
-                    <span class="${draft.item_name ? "" : "missing"}">商品：${formatValue(draft.item_name)}</span>
-                    <span>尺寸：${formatValue(draft.size)}</span>
-                    <span class="${draft.quantity > 0 ? "" : "missing"}">数量：${formatValue(draft.quantity)}</span>
-                    <span class="${draft.unit_price > 0 ? "" : "missing"}">单价：${formatValue(draft.unit_price)}</span>
-                    <span>已收：${formatValue(draft.paid_amount)}</span>
-                </div>
-                ${issueHtml}
-            </div>
-        `;
-    }).join("");
-    list.hidden = false;
-    list.querySelectorAll(".draft-apply-btn").forEach(btn => {
-        btn.addEventListener("click", () => {
-            const entry = orders[Number(btn.dataset.index)];
-            if (entry && entry.draft) {
-                applyDraft(entry.draft);
-                document.getElementById("draft-message").hidden = false;
-                document.getElementById("draft-message").textContent = "已填入选中的草稿，可以继续修改后提交。";
-            }
-        });
-    });
-}
-
-async function parseVoiceText() {
-    const voiceText = document.getElementById("voice-text");
-    const message = document.getElementById("draft-message");
-    const text = voiceText.value.trim();
-    if (!text) {
-        message.hidden = false;
-        message.textContent = "先说一句或输入一段订单内容。";
-        return;
-    }
-
-    message.hidden = false;
-    message.textContent = "正在生成草稿...";
-    const resp = await fetch("/api/voice-order-draft", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({text})
-    });
-    const data = await resp.json();
-    if (!data.ok) {
-        message.textContent = data.message || "解析失败";
-        return;
-    }
-
-    const orders = data.orders || (data.draft ? [{draft: data.draft, issues: data.issues || []}] : []);
-    const needsReview = Boolean(data.needs_review || data.confidence < 0.65 || (data.issues && data.issues.length));
-    if (orders.length && !needsReview) {
-        applyDraft(orders[0].draft);
-    }
-    renderDraftCards(orders, data.issues || [], needsReview);
-    const issueText = needsReview
-        ? `请先核对草稿，确认无误后点击“填入这一单”。${data.issues && data.issues.length ? ` 提示：${data.issues.join("；")}` : ""}`
-        : "已自动填入表单，可以继续修改后提交。";
-    const confidenceText = data.confidence !== undefined ? ` 置信度：${Math.round(data.confidence * 100)}%` : "";
-    message.textContent = `${issueText} 来源：${data.source_model}${confidenceText}`;
-}
-
-function setupVoiceInput() {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const voiceBtn = document.getElementById("voice-btn");
-    const status = document.getElementById("voice-status");
-    if (!SpeechRecognition) {
-        status.textContent = "当前浏览器不支持语音识别，可以直接输入文字后解析。";
-        voiceBtn.disabled = true;
-        return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = "zh-CN";
-    recognition.interimResults = false;
-    recognition.continuous = false;
-
-    voiceBtn.addEventListener("click", () => {
-        status.textContent = "正在听...";
-        voiceBtn.classList.add("recording");
-        recognition.start();
-    });
-
-    recognition.addEventListener("result", event => {
-        const text = Array.from(event.results).map(result => result[0].transcript).join("");
-        document.getElementById("voice-text").value = text;
-        status.textContent = "已识别，正在生成草稿。";
-        parseVoiceText();
-    });
-
-    recognition.addEventListener("end", () => {
-        voiceBtn.classList.remove("recording");
-        if (status.textContent === "正在听...") {
-            status.textContent = "语音已结束。";
-        }
-    });
-
-    recognition.addEventListener("error", event => {
-        voiceBtn.classList.remove("recording");
-        status.textContent = `语音识别失败：${event.error || "请重试"}`;
-    });
-}
-
-async function fillRecentPriceIfNeeded() {
-    const itemName = document.getElementById("item-input").value.trim();
-    const size = document.getElementById("size-input").value.trim();
-    const unitPriceInput = document.getElementById("unit-price-input");
-    if (!itemName || Number(unitPriceInput.value || 0) > 0) return;
-
-    const resp = await fetch(`/api/recent-price?item_name=${encodeURIComponent(itemName)}&size=${encodeURIComponent(size)}`);
-    const data = await resp.json();
-    if (data.ok && data.unit_price) {
-        unitPriceInput.value = data.unit_price;
-        updateAmountPreview();
-        const message = document.getElementById("draft-message");
-        message.hidden = false;
-        message.textContent = `已按历史订单 ${data.order_no} 带入最近单价，可修改。`;
-    }
-}
-
-let deferredInstallPrompt = null;
-window.addEventListener("beforeinstallprompt", event => {
-    event.preventDefault();
-    deferredInstallPrompt = event;
-    document.getElementById("install-app-btn").hidden = false;
-});
-
-document.getElementById("install-app-btn").addEventListener("click", async () => {
-    if (!deferredInstallPrompt) return;
-    deferredInstallPrompt.prompt();
-    await deferredInstallPrompt.userChoice;
-    deferredInstallPrompt = null;
-    document.getElementById("install-app-btn").hidden = true;
-});
-
-if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("/static/sw.js");
-}
-
-const voiceModal = document.getElementById("voiceModal");
-document.getElementById("open-voice-modal").addEventListener("click", () => {
-    voiceModal.hidden = false;
-});
-document.querySelectorAll("[data-close-voice-modal]").forEach(item => {
-    item.addEventListener("click", () => {
-        voiceModal.hidden = true;
-    });
-});
-
-bindSuggest("customer-input", "customer-suggest", "customer");
-bindSuggest("item-input", "item-suggest", "item_name");
-bindSuggest("size-input", "size-suggest", "size");
-document.getElementById("parse-text-btn").addEventListener("click", parseVoiceText);
-document.getElementById("clear-draft-btn").addEventListener("click", () => {
-    document.getElementById("voice-text").value = "";
-    document.getElementById("draft-message").hidden = true;
-    document.getElementById("draft-list").hidden = true;
-});
-document.getElementById("quantity-input").addEventListener("input", updateAmountPreview);
-document.getElementById("unit-price-input").addEventListener("input", updateAmountPreview);
-document.getElementById("item-input").addEventListener("blur", fillRecentPriceIfNeeded);
-document.getElementById("size-input").addEventListener("blur", fillRecentPriceIfNeeded);
-setupVoiceInput();
-updateAmountPreview();
-</script>
-</body>
-</html>
+{% block page_scripts %}
+<script src="/static/js/order_form.js" defer></script>
+<script src="/static/js/voice_order.js" defer></script>
+{% endblock %}

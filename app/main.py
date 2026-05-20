@@ -66,18 +66,31 @@ def ensure_schema():
                     {"code": f"{category}-{counters[category]:03d}", "id": row._mapping["id"]}
                 )
     if "orders" in inspector.get_table_names():
+        columns = {column["name"] for column in inspector.get_columns("orders")}
+        with engine.begin() as conn:
+            if "order_type" not in columns:
+                conn.execute(text("ALTER TABLE orders ADD COLUMN order_type VARCHAR DEFAULT '瓦楞板'"))
+            if "delivery_status" not in columns:
+                conn.execute(text("ALTER TABLE orders ADD COLUMN delivery_status VARCHAR DEFAULT '未拉走'"))
+            if "delivered_at" not in columns:
+                conn.execute(text("ALTER TABLE orders ADD COLUMN delivered_at DATETIME"))
+
         with engine.begin() as conn:
             legacy_payment_count = conn.execute(text(
-                "SELECT COUNT(*) FROM orders WHERE payment_status = '部分付款'"
+                "SELECT COUNT(*) FROM orders WHERE payment_status IN ('部分付款', '未付款', '已付款')"
             )).scalar() or 0
             if legacy_payment_count:
-                conn.execute(text("UPDATE orders SET payment_status = '未付款' WHERE payment_status = '部分付款'"))
+                conn.execute(text(
+                    "UPDATE orders SET payment_status = "
+                    "CASE WHEN payment_status = '已付款' THEN '已结清' ELSE '未结清' END "
+                    "WHERE payment_status IN ('部分付款', '未付款', '已付款')"
+                ))
 
             stale_unpaid_count = conn.execute(text(
                 "SELECT COUNT(*) FROM orders "
                 "WHERE unpaid_amount != "
                 "CASE "
-                "WHEN payment_status = '已付款' THEN 0 "
+                "WHEN payment_status = '已结清' THEN 0 "
                 "WHEN total_amount - paid_amount > 0 THEN total_amount - paid_amount "
                 "ELSE 0 END"
             )).scalar() or 0
@@ -85,10 +98,13 @@ def ensure_schema():
                 conn.execute(text(
                     "UPDATE orders SET unpaid_amount = "
                     "CASE "
-                    "WHEN payment_status = '已付款' THEN 0 "
+                    "WHEN payment_status = '已结清' THEN 0 "
                     "WHEN total_amount - paid_amount > 0 THEN total_amount - paid_amount "
                     "ELSE 0 END"
                 ))
+
+            conn.execute(text("UPDATE orders SET order_type = '瓦楞板' WHERE order_type IS NULL OR order_type = ''"))
+            conn.execute(text("UPDATE orders SET delivery_status = '未拉走' WHERE delivery_status IS NULL OR delivery_status = ''"))
 
 ensure_schema()
 
@@ -175,13 +191,38 @@ def generate_order_no(db: Session) -> str:
     return f"{today_prefix}-{last_seq + 1:03d}"
 
 
-def calc_payment_status(total_amount: float, deposit_amount: float, payment_status: str = "未付款"):
+ORDER_TYPES = ["瓦楞板", "激光切割"]
+PAYMENT_UNSETTLED = "未结清"
+PAYMENT_SETTLED = "已结清"
+DELIVERY_WAITING = "未拉走"
+DELIVERY_DONE = "已拉走"
+
+
+def normalize_order_type(value: str) -> str:
+    value = str(value or "").strip()
+    return value if value in ORDER_TYPES else "瓦楞板"
+
+
+def normalize_payment_status(value: str) -> str:
+    value = str(value or "").strip()
+    if value in ["已结清", "已付款"]:
+        return PAYMENT_SETTLED
+    return PAYMENT_UNSETTLED
+
+
+def normalize_delivery_status(value: str) -> str:
+    value = str(value or "").strip()
+    return value if value in [DELIVERY_WAITING, DELIVERY_DONE] else DELIVERY_WAITING
+
+
+def calc_payment_status(total_amount: float, deposit_amount: float, payment_status: str = PAYMENT_UNSETTLED):
     deposit_amount = max(deposit_amount or 0, 0)
     balance_due = max((total_amount or 0) - deposit_amount, 0)
+    payment_status = normalize_payment_status(payment_status)
 
-    if payment_status == "已付款" or (total_amount or 0) > 0 and deposit_amount >= total_amount:
-        return 0.0, "已付款"
-    return balance_due, "未付款"
+    if payment_status == PAYMENT_SETTLED or (total_amount or 0) > 0 and deposit_amount >= total_amount:
+        return 0.0, PAYMENT_SETTLED
+    return balance_due, PAYMENT_UNSETTLED
 
 
 def parse_date_field(value: str, label: str):
@@ -196,12 +237,11 @@ def parse_date_field(value: str, label: str):
 
 def order_form_error(
     customer: str,
+    order_type: str,
     item_name: str,
     quantity: int,
     unit_price: float,
     paid_amount: float,
-    priority_color: str,
-    due_date: str,
 ):
     errors = []
     customer = str(customer or "").strip()
@@ -210,6 +250,8 @@ def order_form_error(
         errors.append("客户名称不能为空")
     if not item_name:
         errors.append("商品名称不能为空")
+    if normalize_order_type(order_type) != str(order_type or "").strip():
+        errors.append("订单类型不正确")
     if quantity <= 0:
         errors.append("数量必须大于 0")
     if unit_price <= 0:
@@ -221,19 +263,12 @@ def order_form_error(
     if total_amount and paid_amount > total_amount:
         errors.append("已收金额不能大于总金额")
 
-    if priority_color not in ["红色", "橙色", "黄色", "蓝色", "灰色"]:
-        errors.append("优先级颜色不正确")
-
-    parsed_due_date, date_error = parse_date_field(due_date, "截至日期")
-    if date_error:
-        errors.append(date_error)
-
-    return errors, parsed_due_date
+    return errors
 
 
 def payment_snapshot(order: Order):
     return {
-        "payment_status": order.payment_status,
+        "payment_status": normalize_payment_status(order.payment_status),
         "paid_amount": float(order.paid_amount or 0),
         "unpaid_amount": float(order.unpaid_amount or 0),
     }
@@ -243,22 +278,41 @@ def parse_payment_snapshot(value: str):
     try:
         data = json.loads(value)
     except (TypeError, ValueError, json.JSONDecodeError):
-        return {"payment_status": str(value or "未付款")}
+        return {"payment_status": normalize_payment_status(str(value or PAYMENT_UNSETTLED))}
     if not isinstance(data, dict):
-        return {"payment_status": "未付款"}
+        return {"payment_status": PAYMENT_UNSETTLED}
+    data["payment_status"] = normalize_payment_status(data.get("payment_status"))
     return data
+
+
+def print_delivery_snapshot(order: Order):
+    return {
+        "print_status": order.print_status,
+        "delivery_status": normalize_delivery_status(order.delivery_status),
+        "delivered_at": order.delivered_at.isoformat() if order.delivered_at else "",
+    }
+
+
+def apply_print_delivery_snapshot(order: Order, snapshot: dict):
+    order.print_status = snapshot.get("print_status") or "未打印"
+    order.delivery_status = normalize_delivery_status(snapshot.get("delivery_status"))
+    delivered_at = snapshot.get("delivered_at") or ""
+    if delivered_at:
+        try:
+            order.delivered_at = datetime.fromisoformat(delivered_at)
+        except ValueError:
+            order.delivered_at = None
+    else:
+        order.delivered_at = None
 
 
 def action_label(action: str):
     labels = {
-        "mark_printed": "打印出货单",
-        "mark_production": "标记已投产",
-        "mark_complete": "标记已完成",
+        "mark_printed": "打印出货单并标记拉走",
         "mark_paid": "标记结清",
-        "mark_unpaid": "改回未付款",
+        "mark_unpaid": "改回未结清",
         "undo_payment_status": "撤回付款状态",
-        "undo_print_status": "撤回打印状态",
-        "undo_production_status": "撤回生产状态",
+        "undo_print_status": "撤回打印/拉走状态",
         "edit_order": "编辑订单",
         "delete_order": "删除订单",
     }
@@ -415,12 +469,15 @@ def mark_orders_printed(db: Session, orders: list[Order], operator: str = "") ->
     printed = []
     skipped = []
     for order in orders:
-        if order.print_status == "已打印":
+        if order.print_status == "已打印" and normalize_delivery_status(order.delivery_status) == DELIVERY_DONE:
             skipped.append(order)
             continue
 
-        old_value = order.print_status
+        old_value = json.dumps(print_delivery_snapshot(order), ensure_ascii=False)
         order.print_status = "已打印"
+        order.delivery_status = DELIVERY_DONE
+        order.delivered_at = datetime.utcnow()
+        new_value = json.dumps(print_delivery_snapshot(order), ensure_ascii=False)
         log_operation(
             db=db,
             target_type="order",
@@ -428,7 +485,7 @@ def mark_orders_printed(db: Session, orders: list[Order], operator: str = "") ->
             action="mark_printed",
             field_name="print_status",
             old_value=old_value,
-            new_value=order.print_status,
+            new_value=new_value,
             operator=operator,
         )
         printed.append(order)
@@ -437,8 +494,8 @@ def mark_orders_printed(db: Session, orders: list[Order], operator: str = "") ->
 
 
 def get_latest_reversible_log(db: Session, order_id: int):
-    reversible_actions = ["mark_printed", "mark_production", "mark_complete", "mark_paid", "mark_unpaid"]
-    undo_actions = ["undo_print_status", "undo_production_status", "undo_payment_status"]
+    reversible_actions = ["mark_printed", "mark_paid", "mark_unpaid"]
+    undo_actions = ["undo_print_status", "undo_payment_status"]
 
     latest_undo = (
         db.query(OperationLog)
@@ -526,13 +583,12 @@ def safe_redirect_path(return_to: str, default: str) -> str:
 ORDER_DRAFT_FIELDS = {
     "customer",
     "phone",
+    "order_type",
     "item_name",
     "size",
     "quantity",
     "unit_price",
     "paid_amount",
-    "priority_color",
-    "due_date",
     "remark",
 }
 
@@ -543,6 +599,7 @@ def normalize_order_draft(raw: dict):
 
     for field in ["customer", "phone", "item_name", "size", "remark"]:
         draft[field] = str(draft.get(field) or "").strip()
+    draft["order_type"] = normalize_order_type(draft.get("order_type"))
 
     try:
         draft["quantity"] = int(draft.get("quantity") or 0)
@@ -565,18 +622,6 @@ def normalize_order_draft(raw: dict):
         issues.append("客户名称缺失")
     if not draft["item_name"]:
         issues.append("商品名称缺失")
-
-    if draft.get("priority_color") not in ["红色", "橙色", "黄色", "蓝色", "灰色"]:
-        draft["priority_color"] = "灰色"
-
-    due_date = str(draft.get("due_date") or "").strip()
-    if due_date:
-        try:
-            date.fromisoformat(due_date)
-        except ValueError:
-            issues.append("截至日期格式需要是 YYYY-MM-DD")
-            due_date = ""
-    draft["due_date"] = due_date
 
     return draft, issues
 
@@ -654,15 +699,19 @@ def heuristic_order_draft(text_value: str, hotwords: dict | None = None):
     draft = {
         "customer": "",
         "phone": "",
+        "order_type": "瓦楞板",
         "item_name": "",
         "size": "",
         "quantity": 1,
         "unit_price": 0,
         "paid_amount": 0,
-        "priority_color": "灰色",
-        "due_date": "",
         "remark": text_value,
     }
+
+    for order_type in ORDER_TYPES:
+        if order_type in text_value:
+            draft["order_type"] = order_type
+            break
 
     phone_match = re.search(r"1[3-9]\d{9}", text_value)
     if phone_match:
@@ -679,13 +728,6 @@ def heuristic_order_draft(text_value: str, hotwords: dict | None = None):
     paid_match = re.search(r"(?:定金|已付|付了)\s*(\d+(?:\.\d+)?)", text_value)
     if paid_match:
         draft["paid_amount"] = float(paid_match.group(1))
-
-    for color in ["红色", "橙色", "黄色", "蓝色", "灰色"]:
-        if color in text_value:
-            draft["priority_color"] = color
-            break
-    if "加急" in text_value or "急" in text_value:
-        draft["priority_color"] = "红色"
 
     customer_match = re.search(r"(?:客户|给|帮)\s*([\u4e00-\u9fa5A-Za-z0-9_-]{2,12})", text_value)
     if customer_match:
@@ -722,10 +764,10 @@ def call_deepseek_model(model: str, user_text: str, hotwords: dict | None = None
     system_prompt = (
         "你是订单录入助手。请把用户的自然语言订单解析成 JSON 对象，只返回合法 JSON 字符串，不要 Markdown。"
         "顶层字段必须包含 orders, issues, confidence。orders 是订单数组，每个订单字段必须包含："
-        "customer, phone, item_name, size, quantity, unit_price, paid_amount, priority_color, due_date, remark。"
+        "customer, phone, order_type, item_name, size, quantity, unit_price, paid_amount, remark。"
+        "order_type 只能是瓦楞板或激光切割；无法判断时填瓦楞板。"
         "paid_amount 表示已收金额，例如定金或已付金额；没有收款就填 0。"
-        "priority_color 只能是红色/橙色/黄色/蓝色/灰色；"
-        "due_date 使用 YYYY-MM-DD 或空字符串；无法确定的字段用空字符串或 0。\n\n"
+        "无法确定的字段用空字符串或 0。\n\n"
         f"历史热词 JSON：{json.dumps(hotwords or {}, ensure_ascii=False)}\n"
         "如果用户说法接近历史热词，优先使用历史热词中的标准写法。\n\n"
         "EXAMPLE INPUT:\n"
@@ -736,25 +778,23 @@ def call_deepseek_model(model: str, user_text: str, hotwords: dict | None = None
         "    {\n"
         '      "customer": "张三",\n'
         '      "phone": "",\n'
+        '      "order_type": "瓦楞板",\n'
         '      "item_name": "亚克力牌",\n'
         '      "size": "30x40",\n'
         '      "quantity": 2,\n'
         '      "unit_price": 80,\n'
         '      "paid_amount": 50,\n'
-        '      "priority_color": "红色",\n'
-        '      "due_date": "",\n'
         '      "remark": "明天要，加急"\n'
         "    },\n"
         "    {\n"
         '      "customer": "李四",\n'
         '      "phone": "",\n'
+        '      "order_type": "激光切割",\n'
         '      "item_name": "门头",\n'
         '      "size": "",\n'
         '      "quantity": 1,\n'
         '      "unit_price": 0,\n'
         '      "paid_amount": 0,\n'
-        '      "priority_color": "灰色",\n'
-        '      "due_date": "",\n'
         '      "remark": ""\n'
         "    }\n"
         "  ],\n"
@@ -802,20 +842,21 @@ def call_deepseek_query_model(model: str, user_text: str, hotwords: dict | None 
     base_url = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/chat/completions").strip()
     system_prompt = (
         "你是订单查询助手。请把用户的自然语言查询解析成 JSON 对象，只返回合法 JSON 字符串，不要 Markdown。"
-        "JSON 字段必须包含：keyword, payment_status, production_status, print_status, date_from, date_to, sort_by, issues, confidence。"
-        "payment_status 只能是空字符串/未付款/已付款；production_status 只能是空字符串/未投产/已投产/已完成；"
+        "JSON 字段必须包含：keyword, order_type, payment_status, delivery_status, print_status, date_from, date_to, sort_by, issues, confidence。"
+        "order_type 只能是空字符串/瓦楞板/激光切割；payment_status 只能是空字符串/未结清/已结清；delivery_status 只能是空字符串/未拉走/已拉走；"
         "print_status 只能是空字符串/未打印/已打印；date_from/date_to 使用 YYYY-MM-DD 或空字符串；"
-        "sort_by 只能是 priority_due/payment_first/order_new/order_old/customer/item/amount_desc/amount_asc/unpaid_desc。\n\n"
+        "sort_by 只能是 risk_first/payment_first/order_new/order_old/customer/item/amount_desc/amount_asc/unpaid_desc。\n\n"
         f"今天日期：{date.today().isoformat()}\n"
         f"历史热词 JSON：{json.dumps(hotwords or {}, ensure_ascii=False)}\n"
         "如果用户说到了历史客户、商品或尺寸，把它放进 keyword。\n\n"
         "EXAMPLE INPUT:\n"
-        "查一下方圆这个月未付款的订单，待结金额高的排前面\n\n"
+        "查一下方圆这个月未结清的订单，欠款高的排前面\n\n"
         "EXAMPLE JSON OUTPUT:\n"
         "{\n"
         '  "keyword": "方圆",\n'
-        '  "payment_status": "未付款",\n'
-        '  "production_status": "",\n'
+        '  "order_type": "",\n'
+        '  "payment_status": "未结清",\n'
+        '  "delivery_status": "",\n'
         '  "print_status": "",\n'
         '  "date_from": "2026-04-01",\n'
         '  "date_to": "2026-04-30",\n'
@@ -870,33 +911,37 @@ def month_range(base_date: date, offset: int = 0):
 
 
 def normalize_order_query(raw: dict):
-    allowed_payment = ["", "未付款", "已付款"]
-    allowed_production = ["", "未投产", "已投产", "已完成"]
+    allowed_payment = ["", PAYMENT_UNSETTLED, PAYMENT_SETTLED]
+    allowed_delivery = ["", DELIVERY_WAITING, DELIVERY_DONE]
     allowed_print = ["", "未打印", "已打印"]
-    allowed_sort = ["payment_first", "order_new", "order_old", "customer", "item", "amount_desc", "amount_asc", "unpaid_desc", "priority_due"]
+    allowed_sort = ["risk_first", "payment_first", "order_new", "order_old", "customer", "item", "amount_desc", "amount_asc", "unpaid_desc"]
 
     draft = {
         "keyword": str(raw.get("keyword") or "").strip(),
-        "payment_status": str(raw.get("payment_status") or "").strip(),
-        "production_status": str(raw.get("production_status") or "").strip(),
+        "order_type": str(raw.get("order_type") or "").strip(),
+        "payment_status": normalize_payment_status(raw.get("payment_status")) if str(raw.get("payment_status") or "").strip() else "",
+        "delivery_status": str(raw.get("delivery_status") or "").strip(),
         "print_status": str(raw.get("print_status") or "").strip(),
         "date_from": str(raw.get("date_from") or "").strip(),
         "date_to": str(raw.get("date_to") or "").strip(),
-        "sort_by": str(raw.get("sort_by") or "priority_due").strip(),
+        "sort_by": str(raw.get("sort_by") or "risk_first").strip(),
     }
     issues = [str(issue) for issue in raw.get("issues", []) if issue] if isinstance(raw.get("issues"), list) else []
 
+    if draft["order_type"] and draft["order_type"] not in ORDER_TYPES:
+        issues.append("订单类型不明确")
+        draft["order_type"] = ""
     if draft["payment_status"] not in allowed_payment:
         issues.append("付款状态不明确")
         draft["payment_status"] = ""
-    if draft["production_status"] not in allowed_production:
-        issues.append("投产状态不明确")
-        draft["production_status"] = ""
+    if draft["delivery_status"] not in allowed_delivery:
+        issues.append("拉走状态不明确")
+        draft["delivery_status"] = ""
     if draft["print_status"] not in allowed_print:
         issues.append("打印状态不明确")
         draft["print_status"] = ""
     if draft["sort_by"] not in allowed_sort:
-        draft["sort_by"] = "priority_due"
+        draft["sort_by"] = "risk_first"
 
     for field in ["date_from", "date_to"]:
         if draft[field]:
@@ -918,21 +963,30 @@ def heuristic_order_query(text_value: str, hotwords: dict | None = None):
     today = date.today()
     draft = {
         "keyword": "",
+        "order_type": "",
         "payment_status": "",
-        "production_status": "",
+        "delivery_status": "",
         "print_status": "",
         "date_from": "",
         "date_to": "",
-        "sort_by": "priority_due",
+        "sort_by": "risk_first",
     }
 
-    for status in ["未付款", "已付款"]:
+    for order_type in ORDER_TYPES:
+        if order_type in text_value:
+            draft["order_type"] = order_type
+            break
+    if "未付" in text_value or "欠款" in text_value or "没结清" in text_value:
+        draft["payment_status"] = PAYMENT_UNSETTLED
+    elif "已结清" in text_value or "结清" in text_value or "已付款" in text_value:
+        draft["payment_status"] = PAYMENT_SETTLED
+    for status in [PAYMENT_UNSETTLED, PAYMENT_SETTLED]:
         if status in text_value:
             draft["payment_status"] = status
             break
-    for status in ["未投产", "已投产", "已完成"]:
+    for status in [DELIVERY_WAITING, DELIVERY_DONE]:
         if status in text_value:
-            draft["production_status"] = status
+            draft["delivery_status"] = status
             break
     for status in ["未打印", "已打印"]:
         if status in text_value:
@@ -1371,28 +1425,32 @@ def dashboard(request: Request):
 
         current_user = get_current_user(request, db)
 
-        priority_rank = get_priority_rank_expr()
         today = date.today()
+        week_start = date.fromordinal(today.toordinal() - today.weekday())
 
         pending_orders = (
             db.query(Order)
-            .filter(Order.print_status == "未打印")
+            .filter(or_(Order.payment_status == PAYMENT_UNSETTLED, Order.delivery_status == DELIVERY_WAITING))
             .order_by(
-                priority_rank.asc(),
-                Order.due_date.is_(None).asc(),
-                Order.due_date.asc(),
+                case(
+                    ((Order.delivery_status == DELIVERY_DONE) & (Order.payment_status == PAYMENT_UNSETTLED), 0),
+                    (Order.payment_status == PAYMENT_UNSETTLED, 1),
+                    else_=2,
+                ).asc(),
                 Order.order_no.desc()
             )
+            .limit(80)
             .all()
         )
 
+        unpaid_sum = db.query(func.coalesce(func.sum(Order.unpaid_amount), 0)).filter(Order.payment_status == PAYMENT_UNSETTLED).scalar() or 0
+        week_start_dt = datetime.combine(week_start, datetime.min.time())
         dashboard_stats = {
-            "unprinted": db.query(Order).filter(Order.print_status == "未打印").count(),
-            "unpaid": db.query(Order).filter(Order.payment_status == "未付款").count(),
-            "overdue": db.query(Order).filter(Order.due_date != None, Order.due_date < today, Order.production_status != "已完成").count(),
-            "urgent": db.query(Order).filter(Order.priority_color.in_(["红色", "橙色"]), Order.production_status != "已完成").count(),
-            "waiting_production": db.query(Order).filter(Order.production_status == "未投产").count(),
-            "completed": db.query(Order).filter(Order.production_status == "已完成").count(),
+            "unpaid_amount": float(unpaid_sum),
+            "unpaid_count": db.query(Order).filter(Order.payment_status == PAYMENT_UNSETTLED).count(),
+            "risk_count": db.query(Order).filter(Order.delivery_status == DELIVERY_DONE, Order.payment_status == PAYMENT_UNSETTLED).count(),
+            "waiting_delivery": db.query(Order).filter(Order.delivery_status == DELIVERY_WAITING).count(),
+            "week_count": db.query(Order).filter(Order.created_at >= week_start_dt).count(),
         }
 
         return templates.TemplateResponse(
@@ -1403,6 +1461,7 @@ def dashboard(request: Request):
                 "pending_orders": pending_orders,
                 "dashboard_stats": dashboard_stats,
                 "today": today,
+                "week_start": week_start,
                 "active_nav": "dashboard",
             }
         )
@@ -1418,12 +1477,13 @@ def dashboard(request: Request):
 def order_list(
     request: Request,
     keyword: str = "",
+    order_type: str = "",
     payment_status: str = "",
-    production_status: str = "",
-    print_status: str = "未打印",
+    delivery_status: str = "",
+    print_status: str = "",
     date_from: str = "",
     date_to: str = "",
-    sort_by: str = "priority_due",
+    sort_by: str = "risk_first",
     page: int = 1,
     per_page: int = 50
 ):
@@ -1443,17 +1503,22 @@ def order_list(
                 or_(
                     Order.order_no.like(kw),
                     Order.customer.like(kw),
+                    Order.order_type.like(kw),
                     Order.item_name.like(kw),
                     Order.size.like(kw),
                     Order.remark.like(kw)
                 )
             )
 
-        if payment_status.strip():
-            query = query.filter(Order.payment_status == payment_status.strip())
+        if order_type.strip():
+            query = query.filter(Order.order_type == normalize_order_type(order_type))
 
-        if production_status.strip():
-            query = query.filter(Order.production_status == production_status.strip())
+        normalized_payment = normalize_payment_status(payment_status) if payment_status.strip() else ""
+        if normalized_payment:
+            query = query.filter(Order.payment_status == normalized_payment)
+
+        if delivery_status.strip():
+            query = query.filter(Order.delivery_status == normalize_delivery_status(delivery_status))
 
         if print_status.strip():
             query = query.filter(Order.print_status == print_status.strip())
@@ -1486,9 +1551,18 @@ def order_list(
             .one()
         )
 
-        if sort_by == "payment_first":
+        if sort_by == "risk_first":
+            risk_order = case(
+                ((Order.delivery_status == DELIVERY_DONE) & (Order.payment_status == PAYMENT_UNSETTLED), 0),
+                (Order.payment_status == PAYMENT_UNSETTLED, 1),
+                (Order.delivery_status == DELIVERY_WAITING, 2),
+                else_=3
+            )
+            query = query.order_by(risk_order.asc(), Order.unpaid_amount.desc(), Order.order_no.desc())
+
+        elif sort_by == "payment_first":
             payment_order = case(
-                (Order.payment_status == "未付款", 0),
+                (Order.payment_status == PAYMENT_UNSETTLED, 0),
                 else_=2
             )
             query = query.order_by(payment_order.asc(), Order.order_no.desc())
@@ -1514,15 +1588,6 @@ def order_list(
         elif sort_by == "unpaid_desc":
             query = query.order_by(Order.unpaid_amount.desc(), Order.order_no.desc())
 
-        elif sort_by == "priority_due":
-            priority_rank = get_priority_rank_expr()
-            query = query.order_by(
-                priority_rank.asc(),
-                Order.due_date.is_(None).asc(),
-                Order.due_date.asc(),
-                Order.order_no.desc()
-            )
-
         else:
             query = query.order_by(Order.order_no.desc())
 
@@ -1541,8 +1606,9 @@ def order_list(
             context={
                 "orders": orders,
                 "keyword": keyword,
-                "payment_status": payment_status,
-                "production_status": production_status,
+                "order_type": order_type,
+                "payment_status": normalized_payment,
+                "delivery_status": delivery_status,
                 "print_status": print_status,
                 "date_from": date_from if not from_error else "",
                 "date_to": date_to if not to_error else "",
@@ -1555,6 +1621,7 @@ def order_list(
                 "per_page": per_page,
                 "page_count": page_count,
                 "active_nav": "orders",
+                "order_types": ORDER_TYPES,
             }
         )
     finally:
@@ -1764,7 +1831,9 @@ def order_new(request: Request):
                 "item_options": item_options,
                 "size_options": size_options,
                 "current_user": current_user,
-                "form_data": {}
+                "form_data": {},
+                "order_types": ORDER_TYPES,
+                "active_nav": "order_new",
             }
         )
     finally:
@@ -1776,13 +1845,12 @@ def create_order(
     request: Request,
     customer: str = Form(...),
     phone: str = Form(""),
+    order_type: str = Form("瓦楞板"),
     item_name: str = Form(...),
     size: str = Form(""),
     quantity: int = Form(...),
     unit_price: float = Form(...),
     paid_amount: float = Form(0.0),
-    priority_color: str = Form("灰色"),
-    due_date: str = Form(""),
     remark: str = Form("")
 ):
     db: Session = SessionLocal()
@@ -1791,15 +1859,15 @@ def create_order(
         if redirect:
             return redirect
 
-        errors, parsed_due_date = order_form_error(
+        errors = order_form_error(
             customer,
+            order_type,
             item_name,
             quantity,
             unit_price,
             paid_amount,
-            priority_color,
-            due_date,
         )
+        order_type = normalize_order_type(order_type)
         if errors:
             current_user = get_current_user(request, db)
             return templates.TemplateResponse(
@@ -1811,16 +1879,17 @@ def create_order(
                     "item_options": get_recent_distinct_values(db, Order.item_name, limit=200),
                     "size_options": get_recent_distinct_values(db, Order.size, limit=200),
                     "current_user": current_user,
+                    "order_types": ORDER_TYPES,
+                    "active_nav": "order_new",
                     "form_data": {
                         "customer": customer,
                         "phone": phone,
+                        "order_type": order_type,
                         "item_name": item_name,
                         "size": size,
                         "quantity": quantity,
                         "unit_price": unit_price,
                         "paid_amount": paid_amount,
-                        "priority_color": priority_color,
-                        "due_date": due_date,
                         "remark": remark,
                     },
                     "errors": errors,
@@ -1836,6 +1905,7 @@ def create_order(
             order_no=order_no,
             customer=customer,
             phone=phone,
+            order_type=order_type,
             item_name=item_name,
             size=size,
             quantity=quantity,
@@ -1844,10 +1914,8 @@ def create_order(
             paid_amount=paid_amount,
             unpaid_amount=unpaid_amount,
             payment_status=payment_status_value,
-            production_status="未投产",
             print_status="未打印",
-            priority_color=priority_color,
-            due_date=parsed_due_date,
+            delivery_status=DELIVERY_WAITING,
             remark=remark
         )
 
@@ -1942,6 +2010,7 @@ def edit_order_page(request: Request, order_id: int):
                 "size_options": size_options,
                 "current_user": current_user,
                 "errors": [],
+                "order_types": ORDER_TYPES,
                 "active_nav": "orders",
             }
         )
@@ -1955,13 +2024,12 @@ def edit_order_submit(
     order_id: int,
     customer: str = Form(...),
     phone: str = Form(""),
+    order_type: str = Form("瓦楞板"),
     item_name: str = Form(...),
     size: str = Form(""),
     quantity: int = Form(...),
     unit_price: float = Form(...),
     paid_amount: float = Form(0.0),
-    priority_color: str = Form("灰色"),
-    due_date: str = Form(""),
     remark: str = Form("")
 ):
     db: Session = SessionLocal()
@@ -1974,15 +2042,15 @@ def edit_order_submit(
         if order is None:
             return RedirectResponse(url="/orders", status_code=303)
 
-        errors, parsed_due_date = order_form_error(
+        errors = order_form_error(
             customer,
+            order_type,
             item_name,
             quantity,
             unit_price,
             paid_amount,
-            priority_color,
-            due_date,
         )
+        order_type = normalize_order_type(order_type)
         if errors:
             current_user = get_current_user(request, db)
             return templates.TemplateResponse(
@@ -1995,17 +2063,17 @@ def edit_order_submit(
                     "size_options": get_recent_distinct_values(db, Order.size, limit=200),
                     "current_user": current_user,
                     "active_nav": "orders",
+                    "order_types": ORDER_TYPES,
                     "errors": errors,
                     "form_data": {
                         "customer": customer,
                         "phone": phone,
+                        "order_type": order_type,
                         "item_name": item_name,
                         "size": size,
                         "quantity": quantity,
                         "unit_price": unit_price,
                         "paid_amount": paid_amount,
-                        "priority_color": priority_color,
-                        "due_date": due_date,
                         "remark": remark,
                     },
                 },
@@ -2017,6 +2085,7 @@ def edit_order_submit(
 
         order.customer = customer
         order.phone = phone
+        order.order_type = order_type
         order.item_name = item_name
         order.size = size
         order.quantity = quantity
@@ -2025,8 +2094,6 @@ def edit_order_submit(
         order.paid_amount = paid_amount
         order.unpaid_amount = unpaid_amount
         order.payment_status = payment_status_value
-        order.priority_color = priority_color
-        order.due_date = parsed_due_date
         order.remark = remark
 
 
@@ -2039,7 +2106,7 @@ def edit_order_submit(
             action="edit_order",
             field_name="multiple",
             old_value="订单被编辑",
-            new_value=f"customer={customer}, item_name={item_name}, size={size}, quantity={quantity}, unit_price={unit_price}, paid_amount={paid_amount}",
+            new_value=f"customer={customer}, order_type={order_type}, item_name={item_name}, size={size}, quantity={quantity}, unit_price={unit_price}, paid_amount={paid_amount}",
             operator=current_user.username if current_user else ""
         )
         db.commit()
@@ -2079,6 +2146,7 @@ def mark_order_printed(
         db.commit()
 
         if printed:
+            add_flash(request, f"订单 {order.order_no} 已打印出货单，并标记为已拉走", "success")
             return templates.TemplateResponse(
                 request=request,
                 name="delivery_print_a4.html",
@@ -2225,7 +2293,7 @@ def mark_order_paid(
         order = db.query(Order).filter(Order.id == order_id).first()
         if order is not None:
             old_value = json.dumps(payment_snapshot(order), ensure_ascii=False)
-            order.payment_status = "已付款"
+            order.payment_status = PAYMENT_SETTLED
             order.paid_amount = float(order.total_amount or 0)
             order.unpaid_amount = 0.0
             new_value = json.dumps(payment_snapshot(order), ensure_ascii=False)
@@ -2267,7 +2335,7 @@ def mark_order_unpaid(
         order = db.query(Order).filter(Order.id == order_id).first()
         if order is not None:
             old_value = json.dumps(payment_snapshot(order), ensure_ascii=False)
-            order.payment_status = "未付款"
+            order.payment_status = PAYMENT_UNSETTLED
             order.unpaid_amount = max(float(order.total_amount or 0) - float(order.paid_amount or 0), 0.0)
             if order.unpaid_amount <= 0:
                 order.paid_amount = 0.0
@@ -2286,88 +2354,9 @@ def mark_order_unpaid(
             )
 
             db.commit()
-            add_flash(request, f"订单 {order.order_no} 已改回未付款", "success")
+            add_flash(request, f"订单 {order.order_no} 已改回未结清", "success")
         else:
-            add_flash(request, "订单不存在，无法改回未付款", "error")
-
-        return RedirectResponse(url=safe_redirect_path(return_to, f"/orders/{order_id}"), status_code=303)
-    finally:
-        db.close()
-
-
-@app.post("/orders/{order_id}/production")
-def mark_order_production(
-    request: Request,
-    order_id: int,
-    return_to: str = Form("")
-):
-    db: Session = SessionLocal()
-    try:
-        redirect = require_login(request)
-        if redirect:
-            return redirect
-
-        current_user = get_current_user(request, db)
-
-        order = db.query(Order).filter(Order.id == order_id).first()
-        if order is not None:
-            old_value = order.production_status
-            order.production_status = "已投产"
-
-            log_operation(
-                db=db,
-                target_type="order",
-                target_id=order.id,
-                action="mark_production",
-                field_name="production_status",
-                old_value=old_value,
-                new_value=order.production_status,
-                operator=current_user.username if current_user else ""
-            )
-
-            db.commit()
-            add_flash(request, f"订单 {order.order_no} 已标记为已投产", "success")
-        else:
-            add_flash(request, "订单不存在，无法标记投产", "error")
-
-        return RedirectResponse(url=safe_redirect_path(return_to, f"/orders/{order_id}"), status_code=303)
-    finally:
-        db.close()
-
-@app.post("/orders/{order_id}/complete")
-def mark_order_complete(
-    request: Request,
-    order_id: int,
-    return_to: str = Form("")
-):
-    db: Session = SessionLocal()
-    try:
-        redirect = require_login(request)
-        if redirect:
-            return redirect
-
-        current_user = get_current_user(request, db)
-
-        order = db.query(Order).filter(Order.id == order_id).first()
-        if order is not None:
-            old_value = order.production_status
-            order.production_status = "已完成"
-
-            log_operation(
-                db=db,
-                target_type="order",
-                target_id=order.id,
-                action="mark_complete",
-                field_name="production_status",
-                old_value=old_value,
-                new_value=order.production_status,
-                operator=current_user.username if current_user else ""
-            )
-
-            db.commit()
-            add_flash(request, f"订单 {order.order_no} 已标记为已完成", "success")
-        else:
-            add_flash(request, "订单不存在，无法标记完成", "error")
+            add_flash(request, "订单不存在，无法改回未结清", "error")
 
         return RedirectResponse(url=safe_redirect_path(return_to, f"/orders/{order_id}"), status_code=303)
     finally:
@@ -2428,8 +2417,12 @@ def undo_last_order_action(request: Request, order_id: int):
             return RedirectResponse(url=f"/orders/{order_id}", status_code=303)
 
         if log.field_name == "print_status":
-            current_new_value = order.print_status
-            order.print_status = log.old_value
+            current_new_value = json.dumps(print_delivery_snapshot(order), ensure_ascii=False)
+            try:
+                old_snapshot = json.loads(log.old_value)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                old_snapshot = {"print_status": log.old_value, "delivery_status": DELIVERY_WAITING}
+            apply_print_delivery_snapshot(order, old_snapshot)
 
             log_operation(
                 db=db,
@@ -2438,40 +2431,25 @@ def undo_last_order_action(request: Request, order_id: int):
                 action="undo_print_status",
                 field_name="print_status",
                 old_value=current_new_value,
-                new_value=order.print_status,
-                operator=current_user.username if current_user else ""
-            )
-
-        elif log.field_name == "production_status":
-            current_new_value = order.production_status
-            order.production_status = log.old_value
-
-            log_operation(
-                db=db,
-                target_type="order",
-                target_id=order.id,
-                action="undo_production_status",
-                field_name="production_status",
-                old_value=current_new_value,
-                new_value=order.production_status,
+                new_value=json.dumps(print_delivery_snapshot(order), ensure_ascii=False),
                 operator=current_user.username if current_user else ""
             )
 
         elif log.field_name == "payment_status":
             current_new_value = order.payment_status
             old_snapshot = parse_payment_snapshot(log.old_value)
-            order.payment_status = old_snapshot.get("payment_status") or "未付款"
+            order.payment_status = old_snapshot.get("payment_status") or PAYMENT_UNSETTLED
             if "paid_amount" in old_snapshot:
                 order.paid_amount = float(old_snapshot.get("paid_amount") or 0)
                 order.unpaid_amount = float(old_snapshot.get("unpaid_amount") or 0)
-            elif order.payment_status == "已付款":
+            elif order.payment_status == PAYMENT_SETTLED:
                 order.paid_amount = float(order.total_amount or 0)
                 order.unpaid_amount = 0.0
             else:
                 order.unpaid_amount, order.payment_status = calc_payment_status(
                     order.total_amount,
                     order.paid_amount,
-                    "未付款"
+                    PAYMENT_UNSETTLED
                 )
 
             log_operation(

@@ -1,11 +1,5 @@
-.production-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.filter-form {
-  grid-template-columns: minmax(220px, 1.8fr) repeat(4, minmax(140px, 1fr)) repeat(2, minmax(150px, 1fr)) auto auto;
+.filter-form.ledger-filter-form {
+  grid-template-columns: minmax(220px, 1.8fr) repeat(4, minmax(130px, 1fr)) repeat(2, minmax(150px, 1fr)) auto auto;
 }
 
 .pagination-bar {
@@ -23,27 +17,69 @@
   gap: 8px;
 }
 
-.status-production-未投产 {
+.status-payment-未结清 {
   background: #fff7ed;
   color: #c2410c;
 }
 
-.status-production-已投产 {
-  background: #eff6ff;
-  color: #1d4ed8;
-}
-
-.status-production-已完成 {
+.status-payment-已结清 {
   background: #ecfdf5;
   color: #047857;
 }
 
+.status-delivery-未拉走 {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.status-delivery-已拉走 {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.money-danger {
+  color: #c81e1e;
+  font-weight: 800;
+}
+
+.risk-row {
+  background: #fff7ed;
+}
+
+.risk-card {
+  border-color: #fdba74;
+  box-shadow: 0 10px 28px rgba(194, 65, 12, 0.13);
+}
+
+.ledger-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+}
+
+.ledger-debt {
+  color: #c81e1e;
+  font-size: 42px;
+  font-weight: 900;
+  line-height: 1;
+  margin-top: 6px;
+}
+
+.risk-text {
+  margin: 10px 0 0;
+  color: #9a3412;
+  font-weight: 700;
+}
+
 @media (max-width: 768px) {
-  .filter-form {
+  .ledger-filter-form,
+  .filter-form.ledger-filter-form {
     grid-template-columns: 1fr;
   }
 
-  .pagination-bar {
+  .pagination-bar,
+  .ledger-hero {
     align-items: stretch;
     flex-direction: column;
   }

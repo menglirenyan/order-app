@@ -58,8 +58,8 @@ window.setQuickRange = function setQuickRange(type) {
       const selectedCount = getSelectedOrderIds().size;
       batchPrintBtn.disabled = selectedCount === 0;
       batchPrintHint.textContent = selectedCount
-        ? `已选择 ${selectedCount} 单，提交后会生成 A4 三联出货单。`
-        : "请选择要打印 A4 三联出货单的订单。";
+        ? `已选择 ${selectedCount} 单，提交后会生成出货单并标记已拉走。`
+        : "请选择要打印并标记拉走的订单。";
     }
 
     selectAllPrint.addEventListener("click", () => {
@@ -89,8 +89,9 @@ window.setQuickRange = function setQuickRange(type) {
 
   const queryFieldMap = {
     keyword: "filter-keyword",
+    order_type: "filter-order-type",
     payment_status: "filter-payment-status",
-    production_status: "filter-production-status",
+    delivery_status: "filter-delivery-status",
     print_status: "filter-print-status",
     date_from: "filter-date-from",
     date_to: "filter-date-to",
@@ -99,8 +100,9 @@ window.setQuickRange = function setQuickRange(type) {
 
   const queryLabels = {
     keyword: "关键词",
-    payment_status: "付款状态",
-    production_status: "生产状态",
+    order_type: "订单类型",
+    payment_status: "结清状态",
+    delivery_status: "拉走状态",
     print_status: "打印状态",
     date_from: "开始日期",
     date_to: "结束日期",
@@ -108,15 +110,15 @@ window.setQuickRange = function setQuickRange(type) {
   };
 
   const sortLabels = {
-    priority_due: "默认：优先级+截至日期",
-    payment_first: "未结款优先",
+    risk_first: "风险优先",
+    payment_first: "未结清优先",
     order_new: "订单号：新到旧",
     order_old: "订单号：旧到新",
     customer: "客户名",
     item: "商品名",
     amount_desc: "总金额：高到低",
     amount_asc: "总金额：低到高",
-    unpaid_desc: "待结金额：高到低",
+    unpaid_desc: "欠款：高到低",
   };
 
   function renderQueryDraft(data) {
