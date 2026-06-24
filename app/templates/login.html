@@ -1,31 +1,19 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>登录</title>
-    <link rel="stylesheet" href="/static/app.css">
-</head>
-<body>
+{% extends "layouts/auth.html" %}
+{% block title %}登录{% endblock %}
+{% block content %}
 <div class="auth-page">
     <div class="auth-card">
-        <h1>订单系统登录</h1>
-        <p>请使用授予的账号登录</p>
-
-        {% if error %}
-        <p class="error-text">{{ error }}</p>
-        {% endif %}
-
+        <div class="auth-brand"><span>方</span><strong>方圆订单系统</strong></div>
+        <h1>登录工作台</h1>
+        <p>订单、欠款与出货状态集中管理</p>
+        {% if error %}<p class="error-text" role="alert">{{ error }}</p>{% endif %}
         <form action="/login" method="post" class="auth-form">
-            <input type="text" name="username" placeholder="用户名" required>
-            <input type="password" name="password" placeholder="密码" required>
+            <label for="login-username">用户名</label>
+            <input type="text" name="username" id="login-username" autocomplete="username" required autofocus>
+            <label for="login-password">密码</label>
+            <input type="password" name="password" id="login-password" autocomplete="current-password" required>
             <button class="btn-primary" type="submit">登录</button>
         </form>
-
-        <div class="auth-footer">
-            <a class="btn-link" href="/showcase">游客查看货物展示</a>
-        </div>
     </div>
 </div>
-</body>
-</html>
+{% endblock %}

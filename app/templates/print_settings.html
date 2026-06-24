@@ -1,84 +1,25 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>打印设置</title>
-    <link rel="stylesheet" href="/static/app.css">
-    <script src="/static/mobile_ui.js" defer></script>
-</head>
-<body>
-<div class="layout">
-    <aside class="sidebar">
-        <h2>方圆订单系统</h2>
-        <nav>
-            <a class="nav-link" href="/dashboard">工作台</a>
-            <a class="nav-link" href="/orders">订单列表</a>
-            <a class="nav-link" href="/orders/new">新建订单</a>
-            <a class="nav-link active" href="/print-settings">打印设置</a>
-            <a class="nav-link" href="/showcase">货物展示</a>
-            <a class="nav-link" href="/showcase/manage">展示管理</a>
-            {% if current_user.is_admin %}
-            <a class="nav-link" href="/users">用户管理</a>
-            {% endif %}
-            <a class="nav-link" href="/logout">退出登录</a>
-        </nav>
-    </aside>
-
-    <main class="content">
-        <div class="page-header">
-            <div>
-                <h1>打印设置</h1>
-                <p>设置 A4 三联出货单的标题、联次、底部说明和签字栏。</p>
-            </div>
-            <div class="page-actions">
-                <a class="btn-secondary" href="/orders">返回订单列表</a>
-            </div>
-        </div>
-        {% include "_flash.html" %}
-
-        <section class="card">
-            <h2 class="section-title">A4 三联出货单文案</h2>
-            <form action="/print-settings/delivery-config" method="post" class="settings-form delivery-config-form">
-                <label>
-                    <span>标题</span>
-                    <input type="text" name="title" value="{{ print_config.title }}" required>
-                </label>
-
-                <label>
-                    <span>三联名称（一行一个，保存时取前三个）</span>
-                    <textarea name="copies_text" rows="3" required>{{ copies_text }}</textarea>
-                </label>
-
-                <label>
-                    <span>默认单位</span>
-                    <input type="text" name="unit" value="{{ print_config.unit }}" required>
-                </label>
-
-                <label>
-                    <span>底部说明（一行一条）</span>
-                    <textarea name="footer_lines_text" rows="6" required>{{ footer_lines_text }}</textarea>
-                </label>
-
-                <div class="settings-grid compact-settings-grid">
-                    <label>
-                        <span>送货人标签</span>
-                        <input type="text" name="delivery_person_label" value="{{ print_config.delivery_person_label }}" required>
-                    </label>
-                    <label>
-                        <span>送货人默认值</span>
-                        <input type="text" name="delivery_person_value" value="{{ print_config.delivery_person_value }}">
-                    </label>
-                    <label>
-                        <span>收货签字标签</span>
-                        <input type="text" name="receiver_sign_label" value="{{ print_config.receiver_sign_label }}" required>
-                    </label>
-                </div>
-
-                <button class="btn-primary" type="submit">保存打印文案</button>
-            </form>
-        </section>
-    </main>
+{% extends "layouts/admin.html" %}
+{% block title %}打印设置{% endblock %}
+{% block page_header %}
+<div class="page-header">
+    <div><h1>打印设置</h1><p>设置 A4 出货单的标题、底部说明和签字栏。三层复写纸只打印一次。</p></div>
+    <div class="page-actions"><a class="btn-secondary" href="/orders">返回订单列表</a></div>
 </div>
-</body>
-</html>
+{% endblock %}
+{% block content %}
+<section class="card form-page-card">
+    <h2 class="section-title">A4 出货单文案</h2>
+    <form action="/print-settings/delivery-config" method="post" class="settings-form delivery-config-form">
+        <label><span>标题</span><input type="text" name="title" value="{{ print_config.title }}" required></label>
+        <textarea name="copies_text" hidden>{{ copies_text }}</textarea>
+        <label><span>默认单位</span><input type="text" name="unit" value="{{ print_config.unit }}" required></label>
+        <label><span>底部说明（一行一条）</span><textarea name="footer_lines_text" rows="6" required>{{ footer_lines_text }}</textarea></label>
+        <div class="settings-grid compact-settings-grid">
+            <label><span>送货人标签</span><input type="text" name="delivery_person_label" value="{{ print_config.delivery_person_label }}" required></label>
+            <label><span>送货人默认值</span><input type="text" name="delivery_person_value" value="{{ print_config.delivery_person_value }}"></label>
+            <label><span>收货签字标签</span><input type="text" name="receiver_sign_label" value="{{ print_config.receiver_sign_label }}" required></label>
+        </div>
+        <div class="form-grid-actions"><button class="btn-primary" type="submit">保存打印文案</button></div>
+    </form>
+</section>
+{% endblock %}

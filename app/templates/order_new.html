@@ -20,15 +20,17 @@
 {% block content %}
 <section class="card mobile-form-card ledger-form-card">
     {% if errors %}
-    <ul class="form-error-list">
+    <ul class="form-error-list" id="form-errors" role="alert" tabindex="-1">
         {% for error in errors %}
         <li>{{ error }}</li>
         {% endfor %}
     </ul>
     {% endif %}
-    <form action="/orders" method="post" class="mobile-order-form" id="order-form">
-        <div class="form-item">
-            <label>客户名称 <span class="required-star">*</span></label>
+    <form action="/orders" method="post" class="mobile-order-form efficient-order-form" id="order-form">
+        <div class="form-section-label">客户和货物</div>
+
+        <div class="form-item form-item-full">
+            <label for="customer-input">客户名称 <span class="required-star">*</span></label>
             <div class="suggest-wrap">
                 <input type="text" name="customer" id="customer-input" list="customer-options" autocomplete="off" value="{{ form_data.get('customer', '') }}" required>
                 <datalist id="customer-options">
@@ -41,12 +43,12 @@
         </div>
 
         <div class="form-item form-item-small">
-            <label>联系电话</label>
+            <label for="phone-input">联系电话</label>
             <input type="text" name="phone" id="phone-input" inputmode="tel" autocomplete="tel" value="{{ form_data.get('phone', '') }}">
         </div>
 
-        <div class="form-item">
-            <label>订单类型 <span class="required-star">*</span></label>
+        <div class="form-item form-item-full">
+            <label for="order-type-input">订单类型 <span class="required-star">*</span></label>
             <select name="order_type" id="order-type-input" required>
                 {% set selected_order_type = form_data.get('order_type', '瓦楞板') %}
                 {% for option in order_types %}
@@ -56,7 +58,7 @@
         </div>
 
         <div class="form-item">
-            <label>货物内容 <span class="required-star">*</span></label>
+            <label for="item-input">货物内容 <span class="required-star">*</span></label>
             <div class="suggest-wrap">
                 <input type="text" name="item_name" id="item-input" list="item-options" autocomplete="off" value="{{ form_data.get('item_name', '') }}" required>
                 <datalist id="item-options">
@@ -69,7 +71,7 @@
         </div>
 
         <div class="form-item">
-            <label>尺寸/规格</label>
+            <label for="size-input">尺寸/规格</label>
             <div class="suggest-wrap">
                 <input type="text" name="size" id="size-input" list="size-options" autocomplete="off" value="{{ form_data.get('size', '') }}">
                 <datalist id="size-options">
@@ -81,24 +83,41 @@
             </div>
         </div>
 
+        <div class="form-section-label">数量和金额</div>
+
         <div class="form-item">
-            <label>数量 <span class="required-star">*</span></label>
-            <input type="number" name="quantity" id="quantity-input" min="1" step="1" value="{{ form_data.get('quantity', 1) }}" required>
+            <label for="quantity-input">数量 <span class="required-star">*</span></label>
+            <input type="number" name="quantity" id="quantity-input" min="1" step="1" inputmode="numeric" value="{{ form_data.get('quantity', 1) }}" required>
         </div>
 
         <div class="form-item">
-            <label>单价 <span class="required-star">*</span> <span class="amount-preview" id="amount-preview">合计 0.00</span></label>
-            <input type="number" name="unit_price" id="unit-price-input" step="0.01" min="0" value="{{ form_data.get('unit_price', '') }}" required>
+            <label for="unit-price-input">单价 <span class="required-star">*</span> <span class="amount-preview" id="amount-preview">合计 0.00</span></label>
+            <input type="number" name="unit_price" id="unit-price-input" step="0.01" min="0.01" inputmode="decimal" value="{{ form_data.get('unit_price', '') }}" required>
         </div>
 
         <div class="form-item">
-            <label>已收金额</label>
-            <input type="number" name="paid_amount" id="paid-amount-input" step="0.01" min="0" value="{{ form_data.get('paid_amount', 0) }}">
-            <small class="help-text">没收钱就填 0；系统自动算欠款。</small>
+            <label for="paid-amount-input">已收金额</label>
+            <input type="number" name="paid_amount" id="paid-amount-input" step="0.01" min="0" inputmode="decimal" aria-describedby="paid-amount-help" value="{{ form_data.get('paid_amount', 0) }}">
+            <small class="help-text" id="paid-amount-help">没收钱就填 0；系统自动算欠款。</small>
         </div>
 
-        <div class="form-item">
-            <label>备注</label>
+        <div class="form-money-summary" aria-live="polite">
+            <div>
+                <span>总金额</span>
+                <strong id="total-preview-value">0.00</strong>
+            </div>
+            <div>
+                <span>已收</span>
+                <strong id="paid-preview-value">0.00</strong>
+            </div>
+            <div class="is-danger">
+                <span>待结金额</span>
+                <strong id="balance-preview-value">0.00</strong>
+            </div>
+        </div>
+
+        <div class="form-item form-item-full">
+            <label for="remark-input">备注</label>
             <textarea name="remark" id="remark-input" rows="4" placeholder="例如：从微信复制来的要求、谁来拉货、特殊说明">{{ form_data.get('remark', '') }}</textarea>
         </div>
 
@@ -137,6 +156,6 @@
 {% endblock %}
 
 {% block page_scripts %}
-<script src="/static/js/order_form.js" defer></script>
-<script src="/static/js/voice_order.js" defer></script>
+<script src="/static/js/order_form.js?v=20260621-1" defer></script>
+<script src="/static/js/voice_order.js?v=20260621-1" defer></script>
 {% endblock %}

@@ -2,10 +2,12 @@ from getpass import getpass
 
 from app.db import SessionLocal
 from app.models import User
-from app.main import hash_password
+from app.core.migrations import initialize_database
+from app.core.security import hash_password
 
 
 def main():
+    initialize_database()
     db = SessionLocal()
     try:
         username = input("请输入用户名: ").strip()

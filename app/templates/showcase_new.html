@@ -1,97 +1,26 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>新增展示项</title>
-    <link rel="stylesheet" href="/static/app.css">
-    <script src="/static/mobile_ui.js" defer></script>
-</head>
-<body>
-<div class="layout">
-    <aside class="sidebar">
-        <h2>方圆订单系统</h2>
-        <nav>
-            <a class="nav-link" href="/dashboard">工作台</a>
-            <a class="nav-link" href="/orders">订单列表</a>
-            <a class="nav-link" href="/orders/new">新建订单</a>
-            <a class="nav-link" href="/showcase">货物展示</a>
-            <a class="nav-link active" href="/showcase/manage">展示管理</a>
-            {% if current_user.is_admin %}
-            <a class="nav-link" href="/print-settings">打印设置</a>
-            <a class="nav-link" href="/users">用户管理</a>
-            {% endif %}
-            <a class="nav-link" href="/logout">退出登录</a>
-        </nav>
-    </aside>
-
-    <main class="content">
-        <div class="page-header">
-            <div>
-                <h1>新增展示项</h1>
-                <p>图片通过本地文件上传，保存后自动生成唯一号</p>
+{% extends "layouts/admin.html" %}
+{% block title %}新增收藏{% endblock %}
+{% block page_header %}
+<div class="page-header"><div><h1>新增收藏</h1><p>图片通过本地文件上传，保存后自动生成唯一号</p></div></div>
+{% endblock %}
+{% block content %}
+{% if error %}<div class="error-text" role="alert">{{ error }}</div>{% endif %}
+<div class="card form-page-card">
+    <form action="/showcase/manage/new" method="post" class="form-grid" enctype="multipart/form-data">
+        <div><label for="showcase-title">标题 <span class="required-star">*</span></label><input type="text" name="title" id="showcase-title" required autofocus></div>
+        <div>
+            <label for="showcase-category">类别</label>
+            <input type="text" name="category" id="showcase-category" list="category-options" placeholder="输入新类别或选择已有类别">
+            <datalist id="category-options">{% for category in categories %}<option value="{{ category }}"></option>{% endfor %}</datalist>
+            <div class="category-quick-row">
+                {% for category in categories %}<button type="button" class="category-quick-btn" data-category="{{ category }}">{{ category }}</button>{% endfor %}
             </div>
         </div>
-
-        {% if error %}
-        <div class="error-text">{{ error }}</div>
-        {% endif %}
-        {% include "_flash.html" %}
-
-        <div class="card">
-            <form action="/showcase/manage/new" method="post" class="form-grid" enctype="multipart/form-data">
-                <div>
-                    <label>标题</label>
-                    <input type="text" name="title" required>
-                </div>
-
-                <div>
-                    <label>类别</label>
-                    <input type="text" name="category" list="category-options" placeholder="输入新类别或选择已有类别">
-                    <datalist id="category-options">
-                        {% for category in categories %}
-                        <option value="{{ category }}"></option>
-                        {% endfor %}
-                    </datalist>
-                    <div class="category-quick-row">
-                        {% for category in categories %}
-                        <button type="button" class="category-quick-btn" data-category="{{ category }}">{{ category }}</button>
-                        {% endfor %}
-                    </div>
-                </div>
-
-                <div class="full-width">
-                    <label>上传图片</label>
-                    <input type="file" name="image_file" accept="image/*">
-                </div>
-
-                <div class="full-width">
-                    <label>描述</label>
-                    <textarea name="description" rows="5"></textarea>
-                </div>
-
-                <div>
-                    <label>是否显示</label>
-                    <select name="is_visible">
-                        <option value="true" selected>显示</option>
-                        <option value="false">隐藏</option>
-                    </select>
-                </div>
-
-                <div class="full-width">
-                    <button class="btn-primary" type="submit">保存展示项</button>
-                    <a class="btn-secondary" href="/showcase/manage">返回列表</a>
-                </div>
-            </form>
-        </div>
-    </main>
+        <div class="full-width"><label for="showcase-image">上传图片</label><input type="file" name="image_file" id="showcase-image" accept="image/*"></div>
+        <div class="full-width"><label for="showcase-description">描述</label><textarea name="description" id="showcase-description" rows="5"></textarea></div>
+        <div><label for="showcase-visible">是否显示</label><select name="is_visible" id="showcase-visible"><option value="true" selected>显示</option><option value="false">隐藏</option></select></div>
+        <div class="full-width form-grid-actions"><button class="btn-primary" type="submit">保存收藏</button><a class="btn-secondary" href="/showcase/manage">取消</a></div>
+    </form>
 </div>
-<script>
-document.querySelectorAll(".category-quick-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-        document.querySelector('input[name="category"]').value = btn.dataset.category;
-    });
-});
-</script>
-</body>
-</html>
+{% endblock %}
+{% block page_scripts %}<script src="/static/js/showcase_new.js?v=20260620-3" defer></script>{% endblock %}

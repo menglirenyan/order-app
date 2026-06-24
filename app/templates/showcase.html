@@ -1,31 +1,22 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>货物展示</title>
-    <link rel="stylesheet" href="/static/app.css">
-</head>
-<body>
+{% extends "layouts/public.html" %}
+{% block title %}图片资料整理{% endblock %}
+{% block extra_head %}<meta name="robots" content="noindex,nofollow,noarchive">{% endblock %}
+{% block content %}
 <div class="public-page">
     <div class="public-header shop-header">
         <div>
-            <h1>货物展示</h1>
-            <p>{{ items|length }} 个货物{% if current_category %} · {{ current_category }}{% endif %}{% if current_query %} · 搜索：{{ current_query }}{% endif %}</p>
+            <h1>图片资料整理</h1>
+            <p>{{ items|length }} 条资料{% if current_category %} · {{ current_category }}{% endif %}{% if current_query %} · 搜索：{{ current_query }}{% endif %}</p>
+            <p class="muted-text">仅用于图片编号归档与资料记录，不作为对外服务页面。</p>
         </div>
     </div>
-
     <form class="showcase-search" method="get" action="/showcase">
-        {% if current_category %}
-        <input type="hidden" name="category" value="{{ current_category }}">
-        {% endif %}
-        <input type="search" name="q" value="{{ current_query }}" placeholder="按标题搜索货物">
+        {% if current_category %}<input type="hidden" name="category" value="{{ current_category }}">{% endif %}
+        <label class="visually-hidden" for="showcase-search-input">搜索图片资料</label>
+        <input type="search" name="q" id="showcase-search-input" value="{{ current_query }}" placeholder="按标题搜索资料">
         <button class="btn-primary" type="submit">搜索</button>
-        {% if current_query %}
-        <a class="btn-secondary" href="/showcase{% if current_category %}?category={{ current_category|urlencode }}{% endif %}">清空</a>
-        {% endif %}
+        {% if current_query %}<a class="btn-secondary" href="/showcase{% if current_category %}?category={{ current_category|urlencode }}{% endif %}">清空</a>{% endif %}
     </form>
-
     {% if categories %}
     <div class="category-tabs">
         <a class="category-tab {% if not current_category %}active{% endif %}" href="/showcase{% if current_query %}?q={{ current_query|urlencode }}{% endif %}">全部</a>
@@ -34,34 +25,23 @@
         {% endfor %}
     </div>
     {% endif %}
-
     {% if items %}
     <div class="showcase-grid shop-grid">
         {% for item in items %}
         <article class="showcase-card shop-card">
-            {% if item.image_url %}
-            <div class="showcase-image-frame">
-                <img src="{{ item.image_url }}" alt="{{ item.title }}">
-            </div>
-            {% else %}
-            <div class="showcase-image-frame showcase-image-empty">暂无图片</div>
-            {% endif %}
+            {% if item.image_url %}<div class="showcase-image-frame"><img src="{{ item.image_url }}" alt="{{ item.title }}" loading="lazy" decoding="async"></div>
+            {% else %}<div class="showcase-image-frame showcase-image-empty">暂无图片</div>{% endif %}
             <div class="showcase-card-body">
                 <div class="manage-product-meta">
                     <span class="showcase-category">{{ item.category or "未分类" }}</span>
                     <span class="showcase-code">{{ item.item_code or ("#" ~ item.id) }}</span>
                 </div>
                 <h3>{{ item.title }}</h3>
-                {% if item.description %}
-                <p>{{ item.description }}</p>
-                {% endif %}
+                {% if item.description %}<p>{{ item.description }}</p>{% endif %}
             </div>
         </article>
         {% endfor %}
     </div>
-    {% else %}
-    <div class="empty-box">当前暂无展示内容。</div>
-    {% endif %}
+    {% else %}<div class="empty-box">当前暂无资料内容。</div>{% endif %}
 </div>
-</body>
-</html>
+{% endblock %}

@@ -1,6 +1,6 @@
 {% set flashes = get_flashes(request) %}
 {% if flashes %}
-<div class="flash-stack">
+<div class="flash-stack" role="status" aria-live="polite" aria-atomic="true">
     {% for flash in flashes %}
     <div class="flash-message flash-{{ flash.level or 'success' }}">{{ flash.message }}</div>
     {% endfor %}

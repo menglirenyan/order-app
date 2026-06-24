@@ -1,106 +1,36 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>A4 三联出货单</title>
-    <link rel="stylesheet" href="/static/app.css">
-</head>
-<body class="print-document-body">
+{% extends "layouts/print.html" %}
+{% block title %}A4 出货单{% endblock %}
+{% block content %}
+<div data-print-document data-auto-print="{% if auto_print %}true{% else %}false{% endif %}">
 <div class="print-toolbar no-print">
     <a class="btn-secondary" href="{{ return_to or '/orders' }}">返回</a>
-    <button class="btn-primary" type="button" onclick="window.print()">打印出货单</button>
+    <button class="btn-primary" id="printDeliveryButton" type="button">打印出货单</button>
 </div>
-
-<main class="delivery-print-document">
+<main class="delivery-print-document" id="main-content">
     {% for order in orders %}
     <section class="print-page">
-        {% for copy_label in print_config.copies %}
-        <article class="delivery-copy {% if not loop.last %}copy-divider{% endif %}">
+        <article class="delivery-copy">
             <header class="delivery-copy-header">
-                <div class="delivery-title-wrap">
-                    <h1>{{ print_config.title }}</h1>
-                    <span>{{ copy_label }}</span>
-                </div>
-                <div class="delivery-order-meta">
-                    <span>订单号：{{ order.order_no }}</span>
-                    <span>日期：{{ order.created_date }}</span>
-                </div>
+                <div class="delivery-title-wrap"><h1>{{ print_config.title }}</h1></div>
+                <div class="delivery-order-meta"><span>订单号：{{ order.order_no }}</span><span>日期：{{ order.created_date }}</span></div>
             </header>
-
-            <div class="delivery-customer-row">
-                <span>客户名称：{{ order.customer or "" }}</span>
-                <span>联系电话：{{ order.phone or "" }}</span>
-            </div>
-
+            <div class="delivery-customer-row"><span>客户名称：{{ order.customer or "" }}</span><span>联系电话：{{ order.phone or "" }}</span></div>
             <table class="delivery-table">
-                <thead>
-                    <tr>
-                        <th class="col-name">货物名称</th>
-                        <th class="col-spec">规格</th>
-                        <th class="col-unit">单位</th>
-                        <th class="col-qty">数量</th>
-                        <th class="col-price">单价</th>
-                        <th class="col-amount">货款</th>
-                        <th class="col-remark">备注</th>
-                    </tr>
-                </thead>
+                <thead><tr><th class="col-name">货物名称</th><th class="col-spec">规格</th><th class="col-unit">单位</th><th class="col-qty">数量</th><th class="col-price">单价</th><th class="col-amount">货款</th><th class="col-remark">备注</th></tr></thead>
                 <tbody>
-                    <tr>
-                        <td>{{ order.item_name or "" }}</td>
-                        <td>{{ order.size or "" }}</td>
-                        <td class="text-center">{{ print_config.unit }}</td>
-                        <td class="text-right">{{ order.quantity or "" }}</td>
-                        <td class="text-right">{{ format_money(order.unit_price) }}</td>
-                        <td class="text-right">{{ format_money(order.total_amount) }}</td>
-                        <td>{{ order.remark or "" }}</td>
-                    </tr>
-                    {% for _ in range(3) %}
-                    <tr class="blank-row">
-                        <td>&nbsp;</td>
-                        <td></td>
-                        <td></td>
-                        <td></td>
-                        <td></td>
-                        <td></td>
-                        <td></td>
-                    </tr>
-                    {% endfor %}
+                    <tr><td>{{ order.item_name or "" }}</td><td>{{ order.size or "" }}</td><td class="text-center">{{ print_config.unit }}</td><td class="text-right">{{ order.quantity or "" }}</td><td class="text-right">{{ format_money(order.unit_price) }}</td><td class="text-right">{{ format_money(order.total_amount) }}</td><td>{{ order.remark or "" }}</td></tr>
+                    {% for _ in range(7) %}<tr class="blank-row"><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>{% endfor %}
                 </tbody>
-                <tfoot>
-                    <tr>
-                        <td>合计</td>
-                        <td></td>
-                        <td></td>
-                        <td class="text-right">{{ order.quantity or "" }}</td>
-                        <td></td>
-                        <td class="text-right">{{ format_money(order.total_amount) }}</td>
-                        <td></td>
-                    </tr>
-                </tfoot>
+                <tfoot><tr><td>合计</td><td></td><td></td><td class="text-right">{{ order.quantity or "" }}</td><td></td><td class="text-right">{{ format_money(order.total_amount) }}</td><td></td></tr></tfoot>
             </table>
-
             <footer class="delivery-copy-footer">
-                <div class="delivery-footer-lines">
-                    {% for line in print_config.footer_lines %}
-                    <p>{{ line }}</p>
-                    {% endfor %}
-                </div>
-                <div class="delivery-sign-row">
-                    <span>{{ print_config.delivery_person_label }}：{{ print_config.delivery_person_value }}</span>
-                    <span>{{ print_config.receiver_sign_label }}：</span>
-                </div>
+                <div class="delivery-footer-lines">{% for line in print_config.footer_lines %}<p>{{ line }}</p>{% endfor %}</div>
+                <div class="delivery-sign-row"><span>{{ print_config.delivery_person_label }}：{{ print_config.delivery_person_value }}</span><span>{{ print_config.receiver_sign_label }}：</span></div>
             </footer>
         </article>
-        {% endfor %}
     </section>
     {% endfor %}
 </main>
-
-{% if auto_print %}
-<script>
-window.addEventListener("load", () => window.print());
-</script>
-{% endif %}
-</body>
-</html>
+</div>
+{% endblock %}
+{% block scripts %}<script src="/static/js/delivery_print.js?v=20260620-3" defer></script>{% endblock %}

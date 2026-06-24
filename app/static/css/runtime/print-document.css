@@ -1,0 +1,174 @@
+.print-document-body {
+  margin: 0;
+  background: #eef2f7;
+  color: #000000;
+}
+
+.print-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.94);
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.delivery-print-document {
+  display: grid;
+  gap: 16px;
+  justify-content: center;
+  padding: 18px 0;
+}
+
+.print-page {
+  width: 210mm;
+  height: 297mm;
+  background: #ffffff;
+  box-sizing: border-box;
+  padding: 0;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.16);
+  page-break-after: always;
+}
+
+.print-page:last-child {
+  page-break-after: auto;
+}
+
+.delivery-copy {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 3mm 7mm 6mm;
+  display: grid;
+  grid-template-rows: auto auto auto 1fr;
+  gap: 3.5mm;
+  overflow: hidden;
+}
+
+.delivery-copy-header {
+  min-height: 18mm;
+  display: grid;
+  grid-template-columns: 50mm minmax(0, 1fr) 58mm;
+  align-items: start;
+}
+
+.delivery-title-wrap {
+  grid-column: 2;
+  text-align: center;
+}
+
+.delivery-title-wrap h1 {
+  margin: 0;
+  font-family: "SimHei", "Microsoft YaHei", sans-serif;
+  font-size: 27pt;
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: 0.08em;
+}
+
+.delivery-order-meta {
+  grid-column: 3;
+  display: grid;
+  gap: 2mm;
+  text-align: right;
+  font-size: 11.5pt;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.delivery-customer-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72mm;
+  gap: 8mm;
+  padding: 0 1mm;
+  font-size: 13pt;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.delivery-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  border: 1.4pt solid #000000;
+  font-size: 11.5pt;
+  line-height: 1.3;
+}
+
+.delivery-table th,
+.delivery-table td {
+  border: 1.1pt solid #000000;
+  padding: 2mm 1.6mm;
+  vertical-align: middle;
+  word-break: break-word;
+}
+
+.delivery-table th {
+  text-align: center;
+  font-size: 12pt;
+  font-weight: 900;
+}
+
+.delivery-table tfoot td {
+  font-size: 12pt;
+  font-weight: 900;
+}
+
+.delivery-table .col-name {
+  width: 25%;
+}
+
+.delivery-table .col-spec {
+  width: 16%;
+}
+
+.delivery-table .col-unit {
+  width: 8%;
+}
+
+.delivery-table .col-qty {
+  width: 8%;
+}
+
+.delivery-table .col-price,
+.delivery-table .col-amount {
+  width: 11%;
+}
+
+.delivery-table .col-remark {
+  width: 21%;
+}
+
+.delivery-table .blank-row td {
+  height: 16mm;
+}
+
+.delivery-copy-footer {
+  display: grid;
+  align-content: end;
+  gap: 4mm;
+  font-size: 10.5pt;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.delivery-footer-lines {
+  display: grid;
+  gap: 1mm;
+}
+
+.delivery-footer-lines p {
+  margin: 0;
+}
+
+.delivery-sign-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14mm;
+  padding-top: 2mm;
+  font-size: 12.5pt;
+  line-height: 1.4;
+}

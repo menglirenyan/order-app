@@ -1,126 +1,218 @@
 {% extends "layouts/admin.html" %}
 {% from "components/status_badge.html" import status_badge %}
 
-{% block title %}订单台账{% endblock %}
-
-{% block page_header %}
-<div class="page-header">
-    <div class="page-header-stack">
-        <span class="page-kicker">查账 / 对账</span>
-        <h1>订单台账</h1>
-        <p>按客户、类型、欠款、是否拉走快速查单，少翻纸质单。</p>
-    </div>
-    <div class="page-actions mobile-compact-actions">
-        <button class="btn-secondary" type="button" id="open-query-voice-modal">语音筛选</button>
-        <a class="btn-primary" href="/orders/new">新建订单</a>
-    </div>
-</div>
-{% endblock %}
+{% block title %}订单结果{% endblock %}
 
 {% block content %}
-<section class="card filter-card compact-filter-card">
-    <form method="get" action="/orders" class="filter-form ledger-filter-form" id="order-filter-form">
-        <input type="text" name="keyword" id="filter-keyword" value="{{ keyword }}" placeholder="搜索：订单号/客户/内容/尺寸/备注">
+{% set has_active_filters = keyword or order_type or payment_status or delivery_status or print_status or date_from or date_to or sort_by != "risk_first" %}
+{% set current_url = request.url.path ~ ("?" ~ request.url.query if request.url.query else "") %}
 
-        <select name="order_type" id="filter-order-type">
-            <option value="">全部类型</option>
-            {% for option in order_types %}
-            <option value="{{ option }}" {% if order_type == option %}selected{% endif %}>{{ option }}</option>
-            {% endfor %}
-        </select>
+<div class="ledger-page-flow">
+<section class="ledger-results-heading" aria-labelledby="orderResultsTitle">
+    <div>
+        <h1 id="orderResultsTitle">订单结果</h1>
+        <p>共 {{ total_count }} 条，当前页 {{ orders|length }} 条；总金额 {{ format_money(total_amount_sum) }}，欠款 {{ format_money(balance_due_sum) }}。</p>
+    </div>
+    <div class="ledger-results-heading-actions">
+        {% if has_active_filters %}
+        <a class="btn-secondary" href="/orders">查看全部</a>
+        {% endif %}
+        <a class="btn-primary desktop-new-order-action" href="/orders/new">新建订单</a>
+    </div>
+</section>
 
-        <select name="payment_status" id="filter-payment-status">
-            <option value="">全部结清状态</option>
-            <option value="未结清" {% if payment_status == "未结清" %}selected{% endif %}>未结清</option>
-            <option value="已结清" {% if payment_status == "已结清" %}selected{% endif %}>已结清</option>
-        </select>
+<section class="card ledger-command-card">
+    <form method="get" action="/orders" class="ledger-search-form" id="order-filter-form">
+        <div class="ledger-search-row">
+            <label class="visually-hidden" for="filter-keyword">搜索订单</label>
+            <input class="ledger-search-input" type="search" name="keyword" id="filter-keyword" value="{{ keyword }}" placeholder="搜索订单号、客户、商品、尺寸、备注">
+            <button class="btn-primary" type="submit">搜索</button>
+            <button class="btn-secondary mobile-filter-trigger" type="button" id="open-order-filter-panel">
+                筛选{% if has_active_filters %}<span class="filter-trigger-badge" aria-label="已有筛选条件">已启用</span>{% endif %}
+            </button>
+            <button class="btn-secondary" type="button" id="open-query-voice-modal">语音筛选</button>
+        </div>
 
-        <select name="delivery_status" id="filter-delivery-status">
-            <option value="">全部拉走状态</option>
-            <option value="未拉走" {% if delivery_status == "未拉走" %}selected{% endif %}>未拉走</option>
-            <option value="已拉走" {% if delivery_status == "已拉走" %}selected{% endif %}>已拉走</option>
-        </select>
+        {% if has_active_filters %}
+        <div class="active-filter-row" aria-label="当前筛选条件">
+            <span class="active-filter-label">当前筛选</span>
+            {% if keyword %}
+            <button class="active-filter-chip" type="button" data-clear-filter="keyword">关键词：{{ keyword }}</button>
+            {% endif %}
+            {% if order_type %}
+            <button class="active-filter-chip" type="button" data-clear-filter="order_type">类型：{{ order_type }}</button>
+            {% endif %}
+            {% if payment_status %}
+            <button class="active-filter-chip" type="button" data-clear-filter="payment_status">结清：{{ payment_status }}</button>
+            {% endif %}
+            {% if delivery_status %}
+            <button class="active-filter-chip" type="button" data-clear-filter="delivery_status">拉走：{{ delivery_status }}</button>
+            {% endif %}
+            {% if print_status %}
+            <button class="active-filter-chip mobile-print-hidden" type="button" data-clear-filter="print_status">打印：{{ print_status }}</button>
+            {% endif %}
+            {% if date_from or date_to %}
+            <button class="active-filter-chip" type="button" data-clear-filter="date_range">日期：{{ date_from or "不限" }} 至 {{ date_to or "不限" }}</button>
+            {% endif %}
+            {% if sort_by != "risk_first" %}
+            <button class="active-filter-chip" type="button" data-clear-filter="sort_by">排序：
+                {% if sort_by == "payment_first" %}未结清优先
+                {% elif sort_by == "unpaid_desc" %}欠款高到低
+                {% elif sort_by == "order_new" %}订单号新到旧
+                {% elif sort_by == "order_old" %}订单号旧到新
+                {% elif sort_by == "customer" %}客户名
+                {% elif sort_by == "item" %}内容
+                {% elif sort_by == "amount_desc" %}总金额高到低
+                {% elif sort_by == "amount_asc" %}总金额低到高
+                {% else %}{{ sort_by }}
+                {% endif %}
+            </button>
+            {% endif %}
+            <a class="clear-filter-link" href="/orders">清空</a>
+        </div>
+        {% endif %}
 
-        <select name="print_status" id="filter-print-status">
-            <option value="">全部打印状态</option>
-            <option value="未打印" {% if print_status == "未打印" %}selected{% endif %}>未打印</option>
-            <option value="已打印" {% if print_status == "已打印" %}selected{% endif %}>已打印</option>
-        </select>
+        <div class="filter-sheet" id="order-filter-panel" aria-hidden="true">
+            <div class="filter-sheet-backdrop" data-close-order-filter-panel></div>
+            <div class="filter-sheet-panel" role="dialog" aria-modal="true" aria-labelledby="orderFilterTitle">
+                <div class="filter-sheet-head">
+                    <div>
+                        <h2 id="orderFilterTitle">筛选订单</h2>
+                        <p>选好条件后一次应用，避免手机上频繁跳转。</p>
+                    </div>
+                    <button class="btn-secondary filter-sheet-close" type="button" data-close-order-filter-panel>关闭</button>
+                </div>
 
-        <input type="date" name="date_from" id="filter-date-from" value="{{ date_from }}">
-        <input type="date" name="date_to" id="filter-date-to" value="{{ date_to }}">
+                <div class="ledger-filter-grid">
+                    <label>
+                        <span>订单类型</span>
+                        <select name="order_type" id="filter-order-type">
+                            <option value="">全部类型</option>
+                            {% for option in order_types %}
+                            <option value="{{ option }}" {% if order_type == option %}selected{% endif %}>{{ option }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
 
-        <select name="sort_by" id="filter-sort-by">
-            <option value="risk_first" {% if sort_by == "risk_first" %}selected{% endif %}>风险优先</option>
-            <option value="payment_first" {% if sort_by == "payment_first" %}selected{% endif %}>未结清优先</option>
-            <option value="unpaid_desc" {% if sort_by == "unpaid_desc" %}selected{% endif %}>欠款：高到低</option>
-            <option value="order_new" {% if sort_by == "order_new" %}selected{% endif %}>订单号：新到旧</option>
-            <option value="order_old" {% if sort_by == "order_old" %}selected{% endif %}>订单号：旧到新</option>
-            <option value="customer" {% if sort_by == "customer" %}selected{% endif %}>客户名</option>
-            <option value="item" {% if sort_by == "item" %}selected{% endif %}>内容</option>
-            <option value="amount_desc" {% if sort_by == "amount_desc" %}selected{% endif %}>总金额：高到低</option>
-            <option value="amount_asc" {% if sort_by == "amount_asc" %}selected{% endif %}>总金额：低到高</option>
-        </select>
+                    <label>
+                        <span>结清状态</span>
+                        <select name="payment_status" id="filter-payment-status">
+                            <option value="">全部结清状态</option>
+                            <option value="未结清" {% if payment_status == "未结清" %}selected{% endif %}>未结清</option>
+                            <option value="已结清" {% if payment_status == "已结清" %}selected{% endif %}>已结清</option>
+                        </select>
+                    </label>
 
-        <select name="per_page">
-            <option value="20" {% if per_page == 20 %}selected{% endif %}>每页 20</option>
-            <option value="50" {% if per_page == 50 %}selected{% endif %}>每页 50</option>
-            <option value="100" {% if per_page == 100 %}selected{% endif %}>每页 100</option>
-        </select>
+                    <label>
+                        <span>拉走状态</span>
+                        <select name="delivery_status" id="filter-delivery-status">
+                            <option value="">全部拉走状态</option>
+                            <option value="未拉走" {% if delivery_status == "未拉走" %}selected{% endif %}>未拉走</option>
+                            <option value="已拉走" {% if delivery_status == "已拉走" %}selected{% endif %}>已拉走</option>
+                        </select>
+                    </label>
 
-        <button class="btn-primary" type="submit">筛选</button>
-        <a class="btn-secondary" href="/orders">重置</a>
+                    <label class="mobile-print-hidden">
+                        <span>打印状态</span>
+                        <select name="print_status" id="filter-print-status">
+                            <option value="">全部打印状态</option>
+                            <option value="未打印" {% if print_status == "未打印" %}selected{% endif %}>未打印</option>
+                            <option value="已打印" {% if print_status == "已打印" %}selected{% endif %}>已打印</option>
+                        </select>
+                    </label>
+
+                    <label>
+                        <span>开始日期</span>
+                        <input type="date" name="date_from" id="filter-date-from" value="{{ date_from }}">
+                    </label>
+
+                    <label>
+                        <span>结束日期</span>
+                        <input type="date" name="date_to" id="filter-date-to" value="{{ date_to }}">
+                    </label>
+
+                    <label>
+                        <span>排序方式</span>
+                        <select name="sort_by" id="filter-sort-by">
+                            <option value="risk_first" {% if sort_by == "risk_first" %}selected{% endif %}>风险优先</option>
+                            <option value="payment_first" {% if sort_by == "payment_first" %}selected{% endif %}>未结清优先</option>
+                            <option value="unpaid_desc" {% if sort_by == "unpaid_desc" %}selected{% endif %}>欠款：高到低</option>
+                            <option value="order_new" {% if sort_by == "order_new" %}selected{% endif %}>订单号：新到旧</option>
+                            <option value="order_old" {% if sort_by == "order_old" %}selected{% endif %}>订单号：旧到新</option>
+                            <option value="customer" {% if sort_by == "customer" %}selected{% endif %}>客户名</option>
+                            <option value="item" {% if sort_by == "item" %}selected{% endif %}>内容</option>
+                            <option value="amount_desc" {% if sort_by == "amount_desc" %}selected{% endif %}>总金额：高到低</option>
+                            <option value="amount_asc" {% if sort_by == "amount_asc" %}selected{% endif %}>总金额：低到高</option>
+                        </select>
+                    </label>
+
+                    <label>
+                        <span>每页数量</span>
+                        <select name="per_page">
+                            <option value="20" {% if per_page == 20 %}selected{% endif %}>每页 20</option>
+                            <option value="50" {% if per_page == 50 %}selected{% endif %}>每页 50</option>
+                            <option value="100" {% if per_page == 100 %}selected{% endif %}>每页 100</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div class="filter-sheet-actions">
+                    <a class="btn-secondary" href="/orders">重置</a>
+                    <button class="btn-primary" type="submit">应用筛选</button>
+                </div>
+            </div>
+        </div>
     </form>
-
-    <div class="quick-filter-row">
-        <a class="btn-secondary" href="/orders?payment_status=未结清">查欠款</a>
-        <a class="btn-secondary" href="/orders?payment_status=未结清&delivery_status=已拉走">已拉走未结清</a>
-        <a class="btn-secondary" href="/orders?delivery_status=未拉走">未拉走</a>
-        <button type="button" class="btn-secondary" onclick="setQuickRange('this_month')">本月</button>
-    </div>
 </section>
 
-<section class="card compact-summary-card">
-    <div class="summary-row">
-        <div class="summary-item">
-            <div class="summary-label">筛选结果</div>
-            <div class="summary-value">{{ total_count }}</div>
-        </div>
-        <div class="summary-item">
-            <div class="summary-label">筛选总金额</div>
-            <div class="summary-value">{{ format_money(total_amount_sum) }}</div>
-        </div>
-        <div class="summary-item">
-            <div class="summary-label">筛选欠款</div>
-            <div class="summary-value money-danger">{{ format_money(balance_due_sum) }}</div>
-        </div>
-    </div>
-</section>
+<nav class="ledger-status-strip" aria-label="订单关键状态">
+    <a class="ledger-status-link mobile-commerce-only {% if not payment_status and not delivery_status and not print_status %}is-active{% endif %}" href="/orders">
+        <span>全部</span>
+        <strong>{{ total_count }}</strong>
+    </a>
+    <a class="ledger-status-link is-danger {% if payment_status == '未结清' and not delivery_status %}is-active{% endif %}" href="/orders?payment_status=未结清">
+        <span class="desktop-only-copy">欠款</span>
+        <span class="mobile-commerce-only">待收款</span>
+        <strong class="desktop-only-copy">{{ format_money(balance_due_sum) }}</strong>
+        <strong class="mobile-commerce-only">{{ filtered_unpaid_count }}</strong>
+        <em class="desktop-only-copy">{{ filtered_unpaid_count }} 单</em>
+    </a>
+    <a class="ledger-status-link is-danger {% if payment_status == '未结清' and delivery_status == '已拉走' %}is-active{% endif %}" href="/orders?payment_status=未结清&delivery_status=已拉走">
+        <span class="desktop-only-copy">已拉走未结清</span>
+        <span class="mobile-commerce-only">拉走未结</span>
+        <strong>{{ filtered_risk_count }}</strong>
+    </a>
+    <a class="ledger-status-link is-warning {% if delivery_status == '未拉走' and not payment_status %}is-active{% endif %}" href="/orders?delivery_status=未拉走">
+        <span class="desktop-only-copy">未拉走</span>
+        <span class="mobile-commerce-only">待拉走</span>
+        <strong>{{ filtered_waiting_delivery_count }}</strong>
+    </a>
+    <a class="ledger-status-link is-warning mobile-print-hidden" href="/orders?print_status=未打印">
+        <span>未打印</span>
+        <strong>{{ filtered_unprinted_count }}</strong>
+    </a>
+</nav>
 
-<section class="card order-results-card">
+<section class="card order-results-card ledger-results-card">
     {% if orders %}
-    <form action="/orders/batch-print" method="post" id="batch-print-form" data-confirm="确认打印所选订单的 A4 三联出货单？打印后会标记为已拉走。">
-        <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
-        <div class="bulk-print-bar">
+    <form action="/orders/batch-print" method="post" id="batch-print-form" data-confirm="确认打印所选订单的 A4 出货单？每个订单只打印一次，打印后会标记为已拉走。">
+        <input type="hidden" name="return_to" value="{{ current_url }}">
+        <div class="bulk-print-bar compact-bulk-bar mobile-print-hidden">
             <div class="bulk-print-actions">
-                <button class="btn-secondary" type="button" id="select-all-print">全选未打印/未拉走</button>
+                <button class="btn-secondary" type="button" id="select-all-print">全选当前页待出货</button>
                 <button class="btn-primary" type="submit" id="batch-print-btn" disabled>批量打印出货单</button>
             </div>
             <div class="bulk-print-hint" id="batch-print-hint">请选择要打印并标记拉走的订单。</div>
         </div>
-        <table class="data-table orders-table ledger-table">
+
+        <table class="data-table orders-table ledger-table efficient-orders-table">
             <thead>
                 <tr>
                     <th class="select-col">选择</th>
-                    <th>订单号</th>
-                    <th>客户</th>
-                    <th>类型</th>
-                    <th>内容</th>
-                    <th>总金额</th>
-                    <th>已收</th>
-                    <th>欠款</th>
-                    <th>拉走</th>
-                    <th>结清</th>
+                    <th>客户 / 订单</th>
+                    <th>货物</th>
+                    <th>金额</th>
+                    <th>状态</th>
                     <th>操作</th>
                 </tr>
             </thead>
@@ -134,67 +226,102 @@
                         <span class="muted-text">-</span>
                         {% endif %}
                     </td>
-                    <td>{{ order.order_no }}</td>
-                    <td>{{ order.customer }}</td>
-                    <td>{{ order.order_type }}</td>
-                    <td>{{ order.item_name }}{% if order.size %}<br><span class="muted-text">{{ order.size }}</span>{% endif %}</td>
-                    <td>{{ format_money(order.total_amount) }}</td>
-                    <td>{{ format_money(order.paid_amount) }}</td>
-                    <td class="money-danger">{{ format_money(order.unpaid_amount) }}</td>
-                    <td>{{ status_badge("delivery", order.delivery_status) }}</td>
-                    <td>{{ status_badge("payment", order.payment_status) }}</td>
-                    <td><a class="btn-link" href="/orders/{{ order.id }}">查看</a></td>
+                    <td>
+                        <strong>{{ order.customer }}</strong>
+                        <div class="table-muted-line">{{ order.order_no }} · {{ order.order_type }}</div>
+                    </td>
+                    <td>
+                        <strong>{{ order.item_name }}</strong>
+                        <div class="table-muted-line">{{ order.size or "无规格" }} · {{ order.quantity }} 件</div>
+                        {% if order.remark %}
+                        <div class="table-note-line">{{ order.remark }}</div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div>总额 {{ format_money(order.total_amount) }}</div>
+                        <div class="table-muted-line">已收 {{ format_money(order.paid_amount) }}</div>
+                        <div class="money-danger">欠款 {{ format_money(order.unpaid_amount) }}</div>
+                    </td>
+                    <td>
+                        <div class="table-status-stack">
+                            {{ status_badge("delivery", order.delivery_status) }}
+                            {{ status_badge("payment", order.payment_status) }}
+                            {{ status_badge("print", order.print_status) }}
+                        </div>
+                    </td>
+                    <td><a class="btn-link" href="/orders/{{ order.id }}">详情</a></td>
                 </tr>
             {% endfor %}
             </tbody>
         </table>
     </form>
 
-    <div class="mobile-order-list">
+    <div class="mobile-order-list efficient-mobile-list">
         {% for order in orders %}
-        <article class="mobile-order-card {% if order.delivery_status == '已拉走' and order.payment_status == '未结清' %}risk-card{% endif %}" data-mobile-toggle-card>
+        <article class="mobile-order-card efficient-mobile-card {% if order.delivery_status == '已拉走' and order.payment_status == '未结清' %}risk-card{% endif %}" data-mobile-toggle-card>
             <div class="mobile-order-head">
-                <strong>{{ order.customer }} · {{ order.order_type }}</strong>
-                <span>{{ order.order_no }}</span>
+                <div>
+                    <strong>{{ order.customer }}</strong>
+                    <span>{{ order.order_no }} · {{ order.order_type }}</span>
+                </div>
+                {% if order.payment_status == "未结清" %}
+                <div class="mobile-order-amount"><span>欠款</span><strong>{{ format_money(order.unpaid_amount) }}</strong></div>
+                {% else %}
+                <div class="mobile-order-amount is-settled">已结清</div>
+                {% endif %}
             </div>
             <div class="mobile-order-summary">
                 <div class="mobile-order-main">
                     <div class="mobile-order-title">{{ order.item_name }}</div>
-                    <div class="mobile-order-subtitle">{{ order.size or "无规格" }} · {{ order.quantity }} 件</div>
+                    <div class="mobile-order-subtitle">{{ order.size or "无规格" }} · {{ order.quantity }} 件 · 总额 {{ format_money(order.total_amount) }}</div>
                 </div>
-                <div class="mobile-order-amount">欠款 {{ format_money(order.unpaid_amount) }}</div>
             </div>
             <div class="mobile-order-statuses">
-                {{ status_badge("delivery", order.delivery_status) }}
                 {{ status_badge("payment", order.payment_status) }}
+                {{ status_badge("delivery", order.delivery_status) }}
+                <span class="mobile-print-hidden">{{ status_badge("print", order.print_status) }}</span>
             </div>
-            <div class="mobile-order-more">点击查看完整信息</div>
+            {% if order.payment_status == "未结清" or order.delivery_status != "已拉走" %}
+            <div class="mobile-card-primary-actions">
+                {% if order.delivery_status != "已拉走" %}
+                <form action="/orders/{{ order.id }}/delivered" method="post" data-confirm="确认货物已经拉走？此操作不会标记为已打印。">
+                    <input type="hidden" name="return_to" value="{{ current_url }}">
+                    <button class="btn-secondary mobile-order-action" type="submit">拉走</button>
+                </form>
+                {% endif %}
+                {% if order.payment_status == "未结清" %}
+                <button
+                    class="btn-primary mobile-order-action"
+                    type="button"
+                    data-open-mobile-payment
+                    data-payment-action="/orders/{{ order.id }}/payment"
+                    data-payment-customer="{{ order.customer }}"
+                    data-payment-order-no="{{ order.order_no }}"
+                    data-payment-balance="{{ format_money(order.unpaid_amount) }}"
+                >收款</button>
+                {% endif %}
+            </div>
+            {% endif %}
+            <button class="mobile-order-more" type="button" data-mobile-card-toggle aria-expanded="false">更多信息</button>
             <div class="mobile-order-details">
                 <div class="mobile-order-meta">
-                    <span>总额：{{ format_money(order.total_amount) }}</span>
                     <span>已收：{{ format_money(order.paid_amount) }}</span>
-                    <span>打印：{{ order.print_status }}</span>
                     <span>备注：{{ order.remark or "无" }}</span>
                 </div>
                 <div class="mobile-card-actions">
-                    {% if order.print_status != "已打印" or order.delivery_status != "已拉走" %}
-                    <form action="/orders/{{ order.id }}/print" method="post" data-confirm="确认打印出货单？打印后会标记为已拉走。">
-                        <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
-                        <button class="btn-primary mobile-order-action" type="submit">打印出货单</button>
-                    </form>
-                    {% endif %}
+                    <a class="btn-secondary mobile-order-action" href="/orders/{{ order.id }}">详情</a>
+                    <a class="btn-secondary mobile-order-action" href="/orders/{{ order.id }}/edit">修改</a>
                     {% if order.payment_status == "未结清" %}
                     <form action="/orders/{{ order.id }}/paid" method="post" data-confirm="确认该订单已结清？">
-                        <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
-                        <button class="btn-secondary mobile-order-action" type="submit">结清</button>
+                        <input type="hidden" name="return_to" value="{{ current_url }}">
+                        <button class="btn-secondary mobile-order-action" type="submit">直接结清</button>
                     </form>
                     {% else %}
                     <form action="/orders/{{ order.id }}/unpaid" method="post" data-confirm="确认改回未结清？">
-                        <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+                        <input type="hidden" name="return_to" value="{{ current_url }}">
                         <button class="btn-secondary mobile-order-action" type="submit">改回未结清</button>
                     </form>
                     {% endif %}
-                    <a class="btn-secondary mobile-order-action" href="/orders/{{ order.id }}/edit">修改订单</a>
                 </div>
             </div>
         </article>
@@ -214,11 +341,37 @@
         </div>
     </div>
     {% else %}
-    {% with title="没有匹配的订单", message="可以换一个客户名，或点击重置查看全部订单。" %}
-        {% include "components/empty_state.html" %}
-    {% endwith %}
+    <div class="empty-state empty-box">
+        <strong>没有匹配的订单</strong>
+        <p>可以换一个客户名、减少筛选条件，或直接查看全部订单。</p>
+        <a class="btn-primary" href="/orders">重置筛选</a>
+    </div>
     {% endif %}
 </section>
+</div>
+
+<div class="app-modal mobile-payment-modal" id="mobilePaymentModal" hidden>
+    <div class="app-modal-backdrop" data-close-mobile-payment></div>
+    <div class="app-modal-panel mobile-payment-panel" role="dialog" aria-modal="true" aria-labelledby="mobilePaymentTitle">
+        <div class="app-modal-head">
+            <div>
+                <p class="mobile-payment-order" id="mobilePaymentOrder"></p>
+                <h2 id="mobilePaymentTitle">登记收款</h2>
+            </div>
+            <button class="btn-secondary" type="button" data-close-mobile-payment>关闭</button>
+        </div>
+        <form class="mobile-payment-form" id="mobile-payment-form" method="post" data-confirm="确认登记这笔收款？金额会累计到已收金额。">
+            <input type="hidden" name="return_to" value="{{ current_url }}">
+            <label for="mobile-payment-amount">本次收款金额</label>
+            <div class="mobile-payment-input-wrap">
+                <span aria-hidden="true">¥</span>
+                <input id="mobile-payment-amount" type="number" name="amount" min="0.01" step="0.01" inputmode="decimal" required>
+            </div>
+            <p>当前欠款 <strong id="mobilePaymentBalance"></strong></p>
+            <button class="btn-primary" type="submit">确认收款</button>
+        </form>
+    </div>
+</div>
 
 <div class="app-modal" id="queryVoiceModal" hidden>
     <div class="app-modal-backdrop" data-close-query-modal></div>
@@ -251,5 +404,5 @@
 {% endblock %}
 
 {% block page_scripts %}
-<script src="/static/js/orders.js" defer></script>
+<script src="/static/js/orders.js?v=20260621-2" defer></script>
 {% endblock %}

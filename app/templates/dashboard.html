@@ -6,9 +6,9 @@
 {% block page_header %}
 <div class="page-header">
     <div class="page-header-stack">
-        <span class="page-kicker">欠款台账</span>
-        <h1>老板看账本</h1>
-        <p>重点看谁欠钱、哪些货还没拉走、哪些已拉走还没结清。当前用户：{{ current_user.username }}</p>
+        <span class="page-kicker">风险与待办</span>
+        <h1>今日工作台</h1>
+        <p>先处理已拉走未结清，再看待出货订单；点击数字可直接进入对应清单。</p>
     </div>
     <div class="page-actions mobile-compact-actions">
         <a class="btn-primary" href="/orders/new">新建订单</a>
@@ -18,18 +18,18 @@
 {% endblock %}
 
 {% block content %}
-<section class="metric-grid ledger-metrics" aria-label="欠款关键状态">
-    <a class="metric-card metric-danger" href="/orders?payment_status=未结清">
+<section class="metric-grid ledger-metrics dashboard-priority-metrics" aria-label="欠款关键状态">
+    <a class="metric-card metric-danger metric-large" href="/orders?payment_status=未结清">
         <strong>{{ format_money(dashboard_stats.unpaid_amount) }}</strong>
         <span>当前欠款总额</span>
-    </a>
-    <a class="metric-card metric-danger" href="/orders?payment_status=未结清">
-        <strong>{{ dashboard_stats.unpaid_count }}</strong>
-        <span>未结清订单</span>
     </a>
     <a class="metric-card metric-warning" href="/orders?payment_status=未结清&delivery_status=已拉走">
         <strong>{{ dashboard_stats.risk_count }}</strong>
         <span>已拉走未结清</span>
+    </a>
+    <a class="metric-card metric-danger" href="/orders?payment_status=未结清">
+        <strong>{{ dashboard_stats.unpaid_count }}</strong>
+        <span>未结清订单</span>
     </a>
     <a class="metric-card" href="/orders?delivery_status=未拉走">
         <strong>{{ dashboard_stats.waiting_delivery }}</strong>
@@ -45,7 +45,7 @@
 <section class="card">
     <div class="bulk-print-bar">
         <div>
-            <h2 class="section-title">需要盯的单子</h2>
+            <h2 class="section-title">需要处理的订单</h2>
             <div class="bulk-print-hint">已拉走未结清排最前面，其次是未结清和未拉走。</div>
         </div>
         <a class="btn-secondary" href="/orders?sort_by=risk_first">查看全部</a>
@@ -86,10 +86,21 @@
                             <button class="btn-primary" type="submit">打印出货单</button>
                         </form>
                         {% endif %}
+                        {% if order.delivery_status != "已拉走" %}
+                        <form action="/orders/{{ order.id }}/delivered" method="post" data-confirm="确认货物已经拉走？此操作不会标记为已打印。">
+                            <input type="hidden" name="return_to" value="/dashboard">
+                            <button class="btn-secondary" type="submit">拉走</button>
+                        </form>
+                        {% endif %}
                         {% if order.payment_status == "未结清" %}
                         <form action="/orders/{{ order.id }}/paid" method="post" data-confirm="确认该订单已结清？">
                             <input type="hidden" name="return_to" value="/dashboard">
                             <button class="btn-secondary" type="submit">结清</button>
+                        </form>
+                        <form class="quick-payment-form" action="/orders/{{ order.id }}/payment" method="post" data-confirm="确认登记这笔收款？金额会累计到已收金额。">
+                            <input type="hidden" name="return_to" value="/dashboard">
+                            <input class="quick-payment-input" type="number" name="amount" min="0.01" max="{{ format_money(order.unpaid_amount) }}" step="0.01" inputmode="decimal" placeholder="本次收款" aria-label="{{ order.customer }}本次收款金额" required>
+                            <button class="btn-secondary" type="submit">收款</button>
                         </form>
                         {% endif %}
                         <a class="btn-link" href="/orders/{{ order.id }}">详情</a>
@@ -118,7 +129,7 @@
                 {{ status_badge("delivery", order.delivery_status) }}
                 {{ status_badge("payment", order.payment_status) }}
             </div>
-            <div class="mobile-order-more">点击查看完整信息</div>
+            <button class="mobile-order-more" type="button" data-mobile-card-toggle aria-expanded="false">展开完整信息</button>
             <div class="mobile-order-details">
                 <div class="mobile-order-meta">
                     <span>总额：{{ format_money(order.total_amount) }}</span>
@@ -127,15 +138,26 @@
                 </div>
                 <div class="mobile-card-actions">
                     {% if order.print_status != "已打印" or order.delivery_status != "已拉走" %}
-                    <form action="/orders/{{ order.id }}/print" method="post" data-confirm="确认打印出货单？打印后会标记为已拉走。">
+                    <form class="mobile-print-hidden" action="/orders/{{ order.id }}/print" method="post" data-confirm="确认打印出货单？打印后会标记为已拉走。">
                         <input type="hidden" name="return_to" value="/dashboard">
                         <button class="btn-primary mobile-order-action" type="submit">打印出货单</button>
+                    </form>
+                    {% endif %}
+                    {% if order.delivery_status != "已拉走" %}
+                    <form action="/orders/{{ order.id }}/delivered" method="post" data-confirm="确认货物已经拉走？此操作不会标记为已打印。">
+                        <input type="hidden" name="return_to" value="/dashboard">
+                        <button class="btn-secondary mobile-order-action" type="submit">拉走</button>
                     </form>
                     {% endif %}
                     {% if order.payment_status == "未结清" %}
                     <form action="/orders/{{ order.id }}/paid" method="post" data-confirm="确认该订单已结清？">
                         <input type="hidden" name="return_to" value="/dashboard">
                         <button class="btn-secondary mobile-order-action" type="submit">结清</button>
+                    </form>
+                    <form class="quick-payment-form" action="/orders/{{ order.id }}/payment" method="post" data-confirm="确认登记这笔收款？金额会累计到已收金额。">
+                        <input type="hidden" name="return_to" value="/dashboard">
+                        <input class="quick-payment-input" type="number" name="amount" min="0.01" max="{{ format_money(order.unpaid_amount) }}" step="0.01" inputmode="decimal" placeholder="本次收款" aria-label="{{ order.customer }}本次收款金额" required>
+                        <button class="btn-secondary mobile-order-action" type="submit">收款</button>
                     </form>
                     {% endif %}
                     <a class="btn-secondary mobile-order-action" href="/orders/{{ order.id }}/edit">修改</a>

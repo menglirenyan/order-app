@@ -1,0 +1,137 @@
+@page {
+  size: A4 portrait;
+  margin: 0;
+}
+
+@media print {
+  html,
+  body {
+    width: 210mm;
+    height: 297mm;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff;
+  }
+
+  .no-print,
+  .print-toolbar,
+  .sidebar,
+  .bottom-nav,
+  .mobile-menu-button,
+  .mobile-new-order-fab {
+    display: none !important;
+  }
+
+  .print-document-body {
+    background: #ffffff;
+  }
+
+  .delivery-print-document {
+    display: block;
+    padding: 0;
+  }
+
+  .print-page {
+    width: 210mm;
+    height: 297mm;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .print-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+}
+.priority-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+}
+
+.priority-红色 {
+  background: #dc2626;
+}
+
+.priority-橙色 {
+  background: #ea580c;
+}
+
+.priority-黄色 {
+  background: #ca8a04;
+}
+
+.priority-蓝色 {
+  background: #2563eb;
+}
+
+.priority-灰色 {
+  background: #6b7280;
+}
+.summary-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.summary-item {
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+
+.summary-label {
+  font-size: 13px;
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+
+.summary-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+}
+
+@media (max-width: 768px) {
+  .summary-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .summary-item {
+    padding: 9px 10px;
+    border-radius: 8px;
+  }
+
+  .summary-label {
+    font-size: 11px;
+    margin-bottom: 4px;
+  }
+
+  .summary-value {
+    font-size: 18px;
+  }
+}
+
+
+.quick-filter-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+@media (max-width: 768px) {
+  .quick-filter-row {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+}

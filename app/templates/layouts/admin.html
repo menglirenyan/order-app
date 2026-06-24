@@ -1,9 +1,22 @@
 {% extends "base.html" %}
+{% from "components/icon.html" import icon %}
+
+{% block body_class %}admin-document{% endblock %}
 
 {% block body %}
+<header class="mobile-topbar no-print">
+    <button class="mobile-menu-button" type="button" data-mobile-menu aria-label="打开导航" aria-controls="appSidebar" aria-expanded="false">
+        {{ icon("menu") }}
+    </button>
+    <div class="mobile-topbar-title">
+        <span>方圆订单</span>
+        <strong>{{ self.title() }}</strong>
+    </div>
+</header>
+<div class="mobile-nav-overlay no-print" data-mobile-overlay hidden></div>
 <div class="layout shell-layout">
     {% include "components/nav.html" %}
-    <main class="content app-main">
+    <main class="content app-main" id="main-content" tabindex="-1">
         {% block page_header %}{% endblock %}
         {% include "_flash.html" %}
         {% block content %}{% endblock %}
@@ -14,6 +27,6 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/mobile_ui.js" defer></script>
+<script src="/static/mobile_ui.js?v=20260621-1" defer></script>
 {% block page_scripts %}{% endblock %}
 {% endblock %}

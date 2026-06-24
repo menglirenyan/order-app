@@ -9,6 +9,14 @@ function formatDate(d) {
   return `${y}-${m}-${day}`;
 }
 
+(() => {
+  if (!window.matchMedia("(max-width: 768px)").matches) return;
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("print_status")) return;
+  url.searchParams.delete("print_status");
+  window.location.replace(url.toString());
+})();
+
 window.setQuickRange = function setQuickRange(type) {
   const fromInput = document.querySelector('input[name="date_from"]');
   const toInput = document.querySelector('input[name="date_to"]');
@@ -77,6 +85,7 @@ window.setQuickRange = function setQuickRange(type) {
   const queryVoiceModal = document.getElementById("queryVoiceModal");
   const openQueryButton = document.getElementById("open-query-voice-modal");
   if (!queryVoiceModal || !openQueryButton) return;
+  const mobileOrderView = window.matchMedia("(max-width: 768px)");
 
   openQueryButton.addEventListener("click", () => {
     queryVoiceModal.hidden = false;
@@ -124,11 +133,13 @@ window.setQuickRange = function setQuickRange(type) {
   function renderQueryDraft(data) {
     const pendingQueryDraft = data.draft || {};
     const fields = document.getElementById("query-draft-fields");
-    const entries = Object.entries(queryLabels).map(([key, label]) => {
-      let value = pendingQueryDraft[key] || "不限";
-      if (key === "sort_by") value = sortLabels[pendingQueryDraft[key]] || "默认：优先级+截至日期";
-      return `<span><strong>${label}</strong>${value}</span>`;
-    });
+    const entries = Object.entries(queryLabels)
+      .filter(([key]) => !(mobileOrderView.matches && key === "print_status"))
+      .map(([key, label]) => {
+        let value = pendingQueryDraft[key] || "不限";
+        if (key === "sort_by") value = sortLabels[pendingQueryDraft[key]] || "默认：优先级+截至日期";
+        return `<span><strong>${label}</strong>${value}</span>`;
+      });
     fields.innerHTML = entries.join("");
 
     const message = document.getElementById("query-draft-message");
@@ -141,7 +152,7 @@ window.setQuickRange = function setQuickRange(type) {
   function submitQueryDraft(draft) {
     Object.entries(queryFieldMap).forEach(([key, id]) => {
       const el = document.getElementById(id);
-      if (el) el.value = draft[key] || "";
+      if (el) el.value = mobileOrderView.matches && key === "print_status" ? "" : draft[key] || "";
     });
     document.getElementById("order-filter-form").submit();
   }
@@ -216,4 +227,100 @@ window.setQuickRange = function setQuickRange(type) {
     document.getElementById("query-voice-status").textContent = "点麦克风说查询条件，识别后会直接执行筛选。";
   });
   setupQueryVoiceInput();
+})();
+
+(() => {
+  const form = document.getElementById("order-filter-form");
+  const panel = document.getElementById("order-filter-panel");
+  const openButton = document.getElementById("open-order-filter-panel");
+  if (!form || !panel || !openButton) return;
+
+  function closePanel() {
+    document.body.classList.remove("orders-filter-open");
+    panel.setAttribute("aria-hidden", "true");
+    openButton.setAttribute("aria-expanded", "false");
+  }
+
+  function openPanel() {
+    document.body.classList.add("orders-filter-open");
+    panel.setAttribute("aria-hidden", "false");
+    openButton.setAttribute("aria-expanded", "true");
+    const firstControl = panel.querySelector("select, input, button");
+    if (firstControl) {
+      firstControl.focus();
+    }
+  }
+
+  openButton.setAttribute("aria-controls", "order-filter-panel");
+  openButton.setAttribute("aria-expanded", "false");
+  openButton.addEventListener("click", openPanel);
+
+  panel.querySelectorAll("[data-close-order-filter-panel]").forEach((item) => {
+    item.addEventListener("click", closePanel);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && document.body.classList.contains("orders-filter-open")) {
+      closePanel();
+      openButton.focus();
+    }
+  });
+
+  closePanel();
+
+  document.querySelectorAll("[data-clear-filter]").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      const key = chip.getAttribute("data-clear-filter");
+      if (key === "date_range") {
+        form.querySelector('[name="date_from"]').value = "";
+        form.querySelector('[name="date_to"]').value = "";
+      } else if (key === "sort_by") {
+        form.querySelector('[name="sort_by"]').value = "risk_first";
+      } else {
+        const field = form.querySelector(`[name="${key}"]`);
+        if (field) field.value = "";
+      }
+      form.submit();
+    });
+  });
+})();
+
+(() => {
+  const modal = document.getElementById("mobilePaymentModal");
+  const form = document.getElementById("mobile-payment-form");
+  const amountInput = document.getElementById("mobile-payment-amount");
+  const orderLabel = document.getElementById("mobilePaymentOrder");
+  const balanceLabel = document.getElementById("mobilePaymentBalance");
+  const openButtons = document.querySelectorAll("[data-open-mobile-payment]");
+  if (!modal || !form || !amountInput || !orderLabel || !balanceLabel || !openButtons.length) return;
+
+  let lastTrigger = null;
+
+  function closeModal() {
+    modal.hidden = true;
+    document.body.classList.remove("mobile-payment-open");
+    lastTrigger?.focus();
+  }
+
+  openButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      lastTrigger = button;
+      form.action = button.dataset.paymentAction;
+      orderLabel.textContent = `${button.dataset.paymentCustomer} · ${button.dataset.paymentOrderNo}`;
+      balanceLabel.textContent = `¥${button.dataset.paymentBalance}`;
+      amountInput.max = button.dataset.paymentBalance;
+      amountInput.value = "";
+      modal.hidden = false;
+      document.body.classList.add("mobile-payment-open");
+      amountInput.focus();
+    });
+  });
+
+  modal.querySelectorAll("[data-close-mobile-payment]").forEach((item) => {
+    item.addEventListener("click", closeModal);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !modal.hidden) closeModal();
+  });
 })();

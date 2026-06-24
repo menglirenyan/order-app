@@ -58,11 +58,23 @@ const fieldMap = {
 function updateAmountPreview() {
   const quantityInput = document.getElementById("quantity-input");
   const unitPriceInput = document.getElementById("unit-price-input");
+  const paidAmountInput = document.getElementById("paid-amount-input");
   const preview = document.getElementById("amount-preview");
   if (!quantityInput || !unitPriceInput || !preview) return;
   const quantity = Number(quantityInput.value || 0);
   const unitPrice = Number(unitPriceInput.value || 0);
-  preview.textContent = `合计 ${(quantity * unitPrice).toFixed(2)}`;
+  const paidAmount = Number((paidAmountInput && paidAmountInput.value) || 0);
+  const totalAmount = quantity * unitPrice;
+  const balanceDue = Math.max(totalAmount - paidAmount, 0);
+
+  preview.textContent = `合计 ${totalAmount.toFixed(2)}`;
+
+  const totalPreview = document.getElementById("total-preview-value");
+  const paidPreview = document.getElementById("paid-preview-value");
+  const balancePreview = document.getElementById("balance-preview-value");
+  if (totalPreview) totalPreview.textContent = totalAmount.toFixed(2);
+  if (paidPreview) paidPreview.textContent = paidAmount.toFixed(2);
+  if (balancePreview) balancePreview.textContent = balanceDue.toFixed(2);
 }
 
 function applyDraft(draft) {
@@ -99,12 +111,14 @@ async function fillRecentPriceIfNeeded() {
 }
 
 (() => {
+  document.getElementById("form-errors")?.focus();
   bindSuggest("customer-input", "customer-suggest", "customer");
   bindSuggest("item-input", "item-suggest", "item_name");
   bindSuggest("size-input", "size-suggest", "size");
 
   document.getElementById("quantity-input")?.addEventListener("input", updateAmountPreview);
   document.getElementById("unit-price-input")?.addEventListener("input", updateAmountPreview);
+  document.getElementById("paid-amount-input")?.addEventListener("input", updateAmountPreview);
   document.getElementById("item-input")?.addEventListener("blur", fillRecentPriceIfNeeded);
   document.getElementById("size-input")?.addEventListener("blur", fillRecentPriceIfNeeded);
 

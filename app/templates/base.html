@@ -6,12 +6,14 @@
     <meta name="theme-color" content="#0f172a">
     <title>{% block title %}方圆订单系统{% endblock %}</title>
     {% block manifest %}{% endblock %}
-    <link rel="stylesheet" href="/static/app.css">
+    <link rel="stylesheet" href="/static/app.css?v=20260621-4">
     {% block extra_head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
+<a class="skip-link" href="#main-content">跳到主要内容</a>
 {% block body %}{% endblock %}
-<script src="/static/js/app.js" defer></script>
+{% block site_footer %}{% include "_icp_footer.html" %}{% endblock %}
+{% block global_scripts %}<script src="/static/js/app.js" defer></script>{% endblock %}
 {% block scripts %}{% endblock %}
 </body>
 </html>

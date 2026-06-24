@@ -18,15 +18,17 @@
 {% block content %}
 <section class="card mobile-form-card ledger-form-card">
     {% if errors %}
-    <ul class="form-error-list">
+    <ul class="form-error-list" id="form-errors" role="alert" tabindex="-1">
         {% for error in errors %}
         <li>{{ error }}</li>
         {% endfor %}
     </ul>
     {% endif %}
-    <form action="/orders/{{ order.id }}/edit" method="post" class="mobile-order-form" data-confirm="确认保存本次修改？">
-        <div class="form-item">
-            <label>客户名称 <span class="required-star">*</span></label>
+    <form action="/orders/{{ order.id }}/edit" method="post" class="mobile-order-form efficient-order-form" id="order-form" data-confirm="确认保存本次修改？">
+        <div class="form-section-label">客户和货物</div>
+
+        <div class="form-item form-item-full">
+            <label for="customer-input">客户名称 <span class="required-star">*</span></label>
             <div class="suggest-wrap">
                 <input type="text" name="customer" id="customer-input" value="{{ form_data.get('customer', order.customer) if form_data is defined else order.customer }}" autocomplete="off" required>
                 <div class="suggest-box" id="customer-suggest"></div>
@@ -34,12 +36,12 @@
         </div>
 
         <div class="form-item form-item-small">
-            <label>联系电话</label>
+            <label for="phone-input">联系电话</label>
             <input type="text" name="phone" id="phone-input" value="{{ form_data.get('phone', order.phone) if form_data is defined else order.phone }}" inputmode="tel" autocomplete="tel">
         </div>
 
-        <div class="form-item">
-            <label>订单类型 <span class="required-star">*</span></label>
+        <div class="form-item form-item-full">
+            <label for="order-type-input">订单类型 <span class="required-star">*</span></label>
             {% set selected_order_type = form_data.get('order_type', order.order_type) if form_data is defined else order.order_type %}
             <select name="order_type" id="order-type-input" required>
                 {% for option in order_types %}
@@ -49,7 +51,7 @@
         </div>
 
         <div class="form-item">
-            <label>货物内容 <span class="required-star">*</span></label>
+            <label for="item-input">货物内容 <span class="required-star">*</span></label>
             <div class="suggest-wrap">
                 <input type="text" name="item_name" id="item-input" value="{{ form_data.get('item_name', order.item_name) if form_data is defined else order.item_name }}" autocomplete="off" required>
                 <div class="suggest-box" id="item-suggest"></div>
@@ -57,31 +59,48 @@
         </div>
 
         <div class="form-item">
-            <label>尺寸/规格</label>
+            <label for="size-input">尺寸/规格</label>
             <div class="suggest-wrap">
                 <input type="text" name="size" id="size-input" value="{{ form_data.get('size', order.size) if form_data is defined else order.size }}" autocomplete="off">
                 <div class="suggest-box" id="size-suggest"></div>
             </div>
         </div>
 
+        <div class="form-section-label">数量和金额</div>
+
         <div class="form-item">
-            <label>数量 <span class="required-star">*</span></label>
-            <input type="number" name="quantity" id="quantity-input" min="1" step="1" value="{{ form_data.get('quantity', order.quantity) if form_data is defined else order.quantity }}" required>
+            <label for="quantity-input">数量 <span class="required-star">*</span></label>
+            <input type="number" name="quantity" id="quantity-input" min="1" step="1" inputmode="numeric" value="{{ form_data.get('quantity', order.quantity) if form_data is defined else order.quantity }}" required>
         </div>
 
         <div class="form-item">
-            <label>单价 <span class="required-star">*</span> <span class="amount-preview" id="amount-preview">合计 0.00</span></label>
-            <input type="number" name="unit_price" id="unit-price-input" step="0.01" min="0" value="{{ form_data.get('unit_price', order.unit_price) if form_data is defined else order.unit_price }}" required>
+            <label for="unit-price-input">单价 <span class="required-star">*</span> <span class="amount-preview" id="amount-preview">合计 0.00</span></label>
+            <input type="number" name="unit_price" id="unit-price-input" step="0.01" min="0.01" inputmode="decimal" value="{{ form_data.get('unit_price', order.unit_price) if form_data is defined else order.unit_price }}" required>
         </div>
 
         <div class="form-item">
-            <label>已收金额</label>
-            <input type="number" name="paid_amount" id="paid-amount-input" step="0.01" min="0" value="{{ form_data.get('paid_amount', order.paid_amount) if form_data is defined else order.paid_amount }}">
-            <small class="help-text">修改后会自动重新计算欠款。</small>
+            <label for="paid-amount-input">已收金额</label>
+            <input type="number" name="paid_amount" id="paid-amount-input" step="0.01" min="0" inputmode="decimal" aria-describedby="paid-amount-help" value="{{ form_data.get('paid_amount', order.paid_amount) if form_data is defined else order.paid_amount }}">
+            <small class="help-text" id="paid-amount-help">修改后会自动重新计算欠款。</small>
         </div>
 
-        <div class="form-item">
-            <label>备注</label>
+        <div class="form-money-summary" aria-live="polite">
+            <div>
+                <span>总金额</span>
+                <strong id="total-preview-value">0.00</strong>
+            </div>
+            <div>
+                <span>已收</span>
+                <strong id="paid-preview-value">0.00</strong>
+            </div>
+            <div class="is-danger">
+                <span>待结金额</span>
+                <strong id="balance-preview-value">0.00</strong>
+            </div>
+        </div>
+
+        <div class="form-item form-item-full">
+            <label for="remark-input">备注</label>
             <textarea name="remark" id="remark-input" rows="4">{{ form_data.get('remark', order.remark) if form_data is defined else order.remark }}</textarea>
         </div>
 
@@ -94,5 +113,5 @@
 {% endblock %}
 
 {% block page_scripts %}
-<script src="/static/js/order_form.js" defer></script>
+<script src="/static/js/order_form.js?v=20260621-1" defer></script>
 {% endblock %}

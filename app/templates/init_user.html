@@ -1,36 +1,15 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <title>初始化账号</title>
-</head>
-<body>
+{% extends "layouts/auth.html" %}
+{% block title %}初始化账号{% endblock %}
+{% block content %}
+<div class="auth-page"><div class="auth-card">
     <h1>初始化系统账号</h1>
     <p>当前系统还没有任何可登录账号，请先创建第一个账号。</p>
-
-    {% if error %}
-    <p style="color:red;">{{ error }}</p>
-    {% endif %}
-
-    <form action="/init-user" method="post">
-        <p>
-            <label>用户名：</label><br>
-            <input type="text" name="username" required>
-        </p>
-
-        <p>
-            <label>密码：</label><br>
-            <input type="password" name="password" required>
-        </p>
-
-        <p>
-            <label>确认密码：</label><br>
-            <input type="password" name="confirm_password" required>
-        </p>
-
-        <p>
-            <button type="submit">创建账号</button>
-        </p>
+    {% if error %}<p class="error-text">{{ error }}</p>{% endif %}
+    <form action="/init-user" method="post" class="auth-form">
+        <label>用户名<input type="text" name="username" required></label>
+        <label>密码<input type="password" name="password" required></label>
+        <label>确认密码<input type="password" name="confirm_password" required></label>
+        <button class="btn-primary" type="submit">创建账号</button>
     </form>
-</body>
-</html>
+</div></div>
+{% endblock %}

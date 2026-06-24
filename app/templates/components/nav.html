@@ -1,15 +1,29 @@
-<aside class="sidebar app-sidebar" aria-label="主导航">
-    <h2>方圆订单系统</h2>
-    <nav>
-        <a class="nav-link {% if active_nav == 'dashboard' %}active{% endif %}" href="/dashboard">工作台</a>
-        <a class="nav-link {% if active_nav == 'orders' %}active{% endif %}" href="/orders">订单列表</a>
-        <a class="nav-link {% if active_nav == 'order_new' %}active{% endif %}" href="/orders/new">新建订单</a>
-        <a class="nav-link {% if active_nav == 'showcase' %}active{% endif %}" href="/showcase">货物展示</a>
-        <a class="nav-link {% if active_nav == 'showcase_manage' %}active{% endif %}" href="/showcase/manage">展示管理</a>
-        {% if current_user and current_user.is_admin %}
-        <a class="nav-link {% if active_nav == 'print_settings' %}active{% endif %}" href="/print-settings">打印设置</a>
-        <a class="nav-link {% if active_nav == 'users' %}active{% endif %}" href="/users">用户管理</a>
-        {% endif %}
-        <a class="nav-link" href="/logout">退出登录</a>
+{% from "components/icon.html" import icon %}
+<aside class="sidebar app-sidebar no-print" id="appSidebar" aria-label="主导航">
+    <a class="sidebar-brand" href="/dashboard" aria-label="方圆订单系统工作台">
+        <span class="sidebar-brand-mark">方</span>
+        <span><strong>方圆订单</strong><small>生产与欠款台账</small></span>
+    </a>
+    <div class="sidebar-section-label">日常业务</div>
+    <nav class="sidebar-nav">
+        <a class="nav-link {% if active_nav == 'dashboard' %}active{% endif %}" href="/dashboard" {% if active_nav == 'dashboard' %}aria-current="page"{% endif %}>{{ icon("dashboard") }}<span>工作台</span></a>
+        <a class="nav-link {% if active_nav == 'orders' %}active{% endif %}" href="/orders" {% if active_nav == 'orders' %}aria-current="page"{% endif %}>{{ icon("orders") }}<span>订单列表</span></a>
+        <a class="nav-link {% if active_nav == 'order_new' %}active{% endif %}" href="/orders/new" {% if active_nav == 'order_new' %}aria-current="page"{% endif %}>{{ icon("add") }}<span>新建订单</span></a>
+        <a class="nav-link {% if active_nav == 'showcase' %}active{% endif %}" href="/showcase" {% if active_nav == 'showcase' %}aria-current="page"{% endif %}>{{ icon("collection") }}<span>我的收藏</span></a>
+        <a class="nav-link {% if active_nav == 'showcase_manage' %}active{% endif %}" href="/showcase/manage" {% if active_nav == 'showcase_manage' %}aria-current="page"{% endif %}>{{ icon("manage") }}<span>收藏管理</span></a>
     </nav>
+    {% if current_user and current_user.is_admin %}
+    <div class="sidebar-section-label">系统管理</div>
+    <nav class="sidebar-nav">
+        <a class="nav-link mobile-print-hidden {% if active_nav == 'print_settings' %}active{% endif %}" href="/print-settings" {% if active_nav == 'print_settings' %}aria-current="page"{% endif %}>{{ icon("print") }}<span>打印设置</span></a>
+        <a class="nav-link {% if active_nav == 'users' %}active{% endif %}" href="/users" {% if active_nav == 'users' %}aria-current="page"{% endif %}>{{ icon("users") }}<span>用户管理</span></a>
+    </nav>
+    {% endif %}
+    <div class="sidebar-footer">
+        <div class="sidebar-user">
+            <span class="sidebar-avatar">{{ current_user.username[:1] if current_user else "用" }}</span>
+            <span><strong>{{ current_user.username if current_user else "当前用户" }}</strong><small>{% if current_user and current_user.is_admin %}管理员{% else %}操作员{% endif %}</small></span>
+        </div>
+        <a class="nav-link nav-link-logout" href="/logout">{{ icon("logout") }}<span>退出登录</span></a>
+    </div>
 </aside>
